@@ -463,7 +463,7 @@
     color: var(--ink);
   }
 
-  .quote-modal { max-width: 720px; }
+  .quote-modal { max-width: 1040px; }
 
   .price-modal { max-width: 1080px; }
   .scripts-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -628,6 +628,17 @@
   .script-detail-caution { font-size: 12.5px; line-height: 1.6; color: #b5501c; background: var(--warn-soft); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; }
   .script-detail-keypoints { font-size: 13px; line-height: 1.8; font-weight: 700; color: #8a5a00; background: #fff6e0; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; }
   .script-detail-followup { font-size: 12.5px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; }
+  .script-related-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .script-related-chip {
+    font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--accent); background: var(--surface); color: var(--accent-strong); cursor: pointer;
+  }
+  .script-related-chip:hover { background: var(--accent); color: #fff; }
+  .script-card-highlight { animation: script-card-flash 1.4s ease; }
+  @keyframes script-card-flash {
+    0% { background: var(--accent-soft, #fff6e0); }
+    100% { background: transparent; }
+  }
   .script-detail-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .script-detail-actions button { font-size: 12.5px; padding: 6px 12px; }
   .script-readme { border: 1.5px solid var(--accent); border-radius: 8px; margin-bottom: 12px; background: var(--surface-alt); overflow: hidden; }
@@ -651,7 +662,7 @@
   .feedback-form input[data-f="country"] { width: 140px; }
   .feedback-form input[data-f="note"] { flex: 1; min-width: 140px; }
   .quote-match-table { max-height: 320px; overflow-y: auto; }
-  .quote-match-table table { min-width: 640px; }
+  .quote-match-table table { min-width: 860px; }
 
   footer.foot { text-align: center; color: var(--ink-faint); font-size: 12px; padding-top: 8px; }
 
@@ -5401,6 +5412,34 @@
     return [s.title, s.category, s.keywords, s.customer_questions, s.situation, s.answer, s.key_points, s.follow_up_questions, s.related_scripts].join(' ').toLowerCase();
   }
   function stripSpace(s) { return (s || '').replace(/\s+/g, ''); }
+  // related_scripts 칸에 "script-084" 같은 id로 적힌 것도 있고, 예전 대본엔 제목 그대로("법인인감 질문") 적힌 것도 있어서
+  // 둘 다 찾아봄: id 완전일치 -> 제목 완전일치 -> 제목에 포함되는지 순서로 시도.
+  function findScriptByIdOrTitle(token) {
+    token = (token || '').trim();
+    if (!token) return null;
+    return scripts.find(function (s) { return s.id === token; }) ||
+      scripts.find(function (s) { return s.title === token; }) ||
+      scripts.find(function (s) { return s.title && s.title.indexOf(token) !== -1; }) ||
+      null;
+  }
+  // "관련 대본" 칩을 누르면 카테고리·검색어 필터를 초기화하고 그 대본이 있는 카드로 스크롤 + 펼쳐서 보여줌
+  function openRelatedScriptToken(token) {
+    var target = findScriptByIdOrTitle(token);
+    if (!target) { alert('연결된 대본을 찾지 못했어요: ' + token); return; }
+    activeScriptCategory = '전체';
+    document.querySelectorAll('.script-category-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-category') === '전체');
+    });
+    document.getElementById('scriptSearchInput').value = '';
+    renderScriptsList();
+    var card = document.querySelector('.script-card[data-id="' + CSS.escape(target.id) + '"]');
+    if (!card) return;
+    card.querySelector('.script-detail').hidden = false;
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    card.classList.remove('script-card-highlight');
+    void card.offsetWidth; // 애니메이션 다시 재생되게 강제로 리플로우
+    card.classList.add('script-card-highlight');
+  }
   function renderScriptsList() {
     var qRaw = (document.getElementById('scriptSearchInput').value || '').trim().toLowerCase();
     var tokens = qRaw.split(/\s+/).filter(Boolean);
@@ -5453,7 +5492,15 @@
     if (s.next_action) blocks += '<div class="script-detail-block"><div class="script-detail-label">↓ 다음 행동</div><div class="script-detail-text">' + escapeHtml(s.next_action) + '</div></div>';
     if (s.required_documents) blocks += '<div class="script-detail-block"><div class="script-detail-label">필요 서류</div><div class="script-detail-text">' + escapeHtml(s.required_documents) + '</div></div>';
     if (s.caution) blocks += '<div class="script-detail-block"><div class="script-detail-caution">⚠ 하지 마세요 / 주의사항<br>' + escapeHtml(s.caution) + '</div></div>';
-    if (s.related_scripts) blocks += '<div class="script-detail-block"><div class="script-detail-label">관련 대본</div><div class="script-detail-text">' + escapeHtml(s.related_scripts) + '</div></div>';
+    if (s.related_scripts) {
+      var relTokens = s.related_scripts.split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+      var relChips = relTokens.map(function (t) {
+        var target = findScriptByIdOrTitle(t);
+        var label = target ? target.title : t;
+        return '<button type="button" class="script-related-chip" data-related="' + escapeHtml(t) + '">' + escapeHtml(label) + (target ? '' : ' (연결 안 됨)') + '</button>';
+      }).join('');
+      blocks += '<div class="script-detail-block"><div class="script-detail-label">관련 대본 · 이어서 보면 좋은 내용</div><div class="script-related-chips">' + relChips + '</div></div>';
+    }
     blocks += '<div class="script-detail-actions">' +
       '<button type="button" class="btn-accent" data-action="copy-script">답변 복사</button>' +
       '<button type="button" class="btn-ghost" data-action="use-script">사용 완료 (' + (s.usage_count || 0) + '회)</button>' +
@@ -5478,6 +5525,8 @@
     if (!card) return;
     var id = card.getAttribute('data-id');
     var s = scripts.find(function (x) { return x.id === id; });
+    var relChip = e.target.closest('[data-related]');
+    if (relChip) { openRelatedScriptToken(relChip.getAttribute('data-related')); return; }
     if (e.target.closest('[data-action="toggle-script"]')) {
       card.querySelector('.script-detail').hidden = !card.querySelector('.script-detail').hidden;
       return;
