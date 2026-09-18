@@ -624,7 +624,11 @@
   .script-detail-block { margin-bottom: 10px; }
   .script-detail-block:last-child { margin-bottom: 0; }
   .script-detail-label { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); margin-bottom: 3px; }
-  .script-detail-text { font-size: 13px; line-height: 1.65; color: var(--ink); white-space: pre-wrap; }
+  .script-detail-text { font-size: 13px; line-height: 1.65; color: var(--ink); }
+  .script-detail-subhead { font-size: 13px; font-weight: 700; color: var(--accent-strong); margin: 10px 0 4px; }
+  .script-detail-subhead:first-child { margin-top: 0; }
+  .script-detail-list { margin: 2px 0 6px; padding-left: 18px; }
+  .script-detail-list li { margin-bottom: 3px; }
   .script-detail-caution { font-size: 12.5px; line-height: 1.6; color: #b5501c; background: var(--warn-soft); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; }
   .script-detail-keypoints { font-size: 13px; line-height: 1.8; font-weight: 700; color: #8a5a00; background: #fff6e0; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; }
   .script-detail-followup { font-size: 12.5px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; }
@@ -5482,15 +5486,37 @@
       '<div class="script-detail" hidden>' + scriptDetailHtml(s) + '</div>' +
       '</div>';
   }
+  function formatDetailText(text) {
+    if (!text) return '';
+    var lines = String(text).split('\n');
+    var html = '';
+    var inList = false;
+    lines.forEach(function (line) {
+      var trimmed = line.trim();
+      if (/^##\s+/.test(trimmed)) {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += '<div class="script-detail-subhead">' + escapeHtml(trimmed.replace(/^##\s+/, '')) + '</div>';
+      } else if (/^[-*]\s+/.test(trimmed)) {
+        if (!inList) { html += '<ul class="script-detail-list">'; inList = true; }
+        html += '<li>' + escapeHtml(trimmed.replace(/^[-*]\s+/, '')) + '</li>';
+      } else {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += trimmed === '' ? '<br>' : escapeHtml(line) + '<br>';
+      }
+    });
+    if (inList) html += '</ul>';
+    return html;
+  }
   function scriptDetailHtml(s) {
+    var isManual = s.category === '메뉴얼';
     var blocks = '';
-    if (s.situation) blocks += '<div class="script-detail-block"><div class="script-detail-label">상황</div><div class="script-detail-text">' + escapeHtml(s.situation) + '</div></div>';
+    if (s.situation) blocks += '<div class="script-detail-block"><div class="script-detail-label">' + (isManual ? '적용 상황' : '상황') + '</div><div class="script-detail-text">' + escapeHtml(s.situation) + '</div></div>';
     if (s.customer_questions) blocks += '<div class="script-detail-block"><div class="script-detail-label">손님 질문</div><div class="script-detail-text">' + escapeHtml(s.customer_questions) + '</div></div>';
-    blocks += '<div class="script-detail-block"><div class="script-detail-label">이렇게 말하세요</div><div class="script-detail-text">' + escapeHtml(s.answer) + '</div></div>';
+    blocks += '<div class="script-detail-block"><div class="script-detail-label">' + (isManual ? '정리 내용' : '이렇게 말하세요') + '</div><div class="script-detail-text">' + formatDetailText(s.answer) + '</div></div>';
     if (s.key_points) blocks += '<div class="script-detail-block"><div class="script-detail-keypoints">⭐ ' + escapeHtml(s.key_points) + '</div></div>';
     if (s.follow_up_questions) blocks += '<div class="script-detail-block"><div class="script-detail-label">손님이 이어서 물어볼 수 있는 질문</div><div class="script-detail-followup">' + escapeHtml(s.follow_up_questions) + '</div></div>';
     if (s.next_action) blocks += '<div class="script-detail-block"><div class="script-detail-label">↓ 다음 행동</div><div class="script-detail-text">' + escapeHtml(s.next_action) + '</div></div>';
-    if (s.required_documents) blocks += '<div class="script-detail-block"><div class="script-detail-label">필요 서류</div><div class="script-detail-text">' + escapeHtml(s.required_documents) + '</div></div>';
+    if (s.required_documents) blocks += '<div class="script-detail-block"><div class="script-detail-label">필요 서류</div><div class="script-detail-text">' + formatDetailText(s.required_documents) + '</div></div>';
     if (s.caution) blocks += '<div class="script-detail-block"><div class="script-detail-caution">⚠ 하지 마세요 / 주의사항<br>' + escapeHtml(s.caution) + '</div></div>';
     if (s.related_scripts) {
       var relTokens = s.related_scripts.split(',').map(function (t) { return t.trim(); }).filter(Boolean);
