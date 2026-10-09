@@ -1,0 +1,17 @@
+[
+ {"who":"doc","text":"속보입니다!","start":6,"expr":"shock"},
+ {"who":"doc","text":"21만 키로 쏘나타, 해외로 도주!!","start":40,"expr":"shock"},
+ {"who":"car","text":"저 지금 인천항인데요…","start":98,"expr":"sad"},
+ {"who":"car","text":"국내에선 150 받았어요…","start":150,"expr":"sad"},
+ {"who":"doc","text":"LPG에 렌터카 출신이라면서요?","start":212,"expr":"smile"},
+ {"who":"car","text":"근데 해외에선 괜찮대요?!","start":262,"expr":"curious"},
+ {"who":"doc","text":"그래서 도착지는요?","start":302,"expr":"smile"},
+ {"who":"car","text":"그건… 광고 보고 오세요","start":347,"expr":"curious"},
+ {"who":"car","text":"요르단입니다!","start":430,"expr":"curious"},
+ {"who":"doc","text":"매입가는요?","start":484,"expr":"smile"},
+ {"who":"car","text":"290이요.","start":530,"expr":"money"},
+ {"who":"doc","text":"플러스 140?!","start":604,"expr":"shock"},
+ {"who":"doc","text":"사장님 차 수출 시세?","start":696,"expr":"smug"},
+ {"who":"doc","text":"프로필에서 물어보세요!","start":758,"expr":"smile"},
+ {"who":"doc","text":"다음 속보 주인공은… 사장님 차?","start":822,"expr":"smug"}
+]
