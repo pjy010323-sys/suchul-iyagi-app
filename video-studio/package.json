@@ -1,0 +1,16 @@
+{
+  "name": "suchul-video-studio",
+  "private": true,
+  "version": "0.0.1",
+  "description": "수출이야기 숏폼 영상 자동 제작 (0단계 시안)",
+  "scripts": {
+    "preview": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts PriceReveal out/price_reveal.mp4 --codec=h264 --crf=18"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.534",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.534"
+  }
+}
