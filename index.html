@@ -921,7 +921,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261027014348">
+<meta name="app-build" content="20261027061518">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -9729,6 +9729,11 @@
       if (e.target.hasAttribute('data-me')) { me[e.target.getAttribute('data-me')] = e.target.value; saveMe(); refreshAll(); return; }
       if (e.target.hasAttribute('data-f')) {
         collectSpec(item, r);
+        // 2026-10-27 사용자: 스펙을 쓰기 시작하면 통화한 것 → 통완 자동 체크 (제목 칸만 고칠 때는 빼고)
+        if (e.target.getAttribute('data-f') !== 'header' && e.target.value.trim() && r.status !== 'done') {
+          r.status = 'done'; saveLead(r);
+          item.querySelectorAll('.ldb-btn[data-k="done"],.ldb-btn[data-k="absent"],.ldb-btn[data-k="callback"]').forEach(function (b) { b.setAttribute('data-on', b.getAttribute('data-k') === 'done' ? '1' : '0'); });
+        }
         if (e.target.getAttribute('data-f') === 'bet' && e.target.value.trim() && !betOn(r)) { r.spec.betDone = true; saveLead(r); }
         var bb = item.querySelector('.ldb-btn[data-k="bet"]'); if (bb) bb.setAttribute('data-on', betOn(r) ? '1' : '0');
         refreshLive(item, r);
