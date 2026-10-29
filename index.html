@@ -921,7 +921,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261027061518">
+<meta name="app-build" content="20261029092923">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -8755,7 +8755,9 @@
     }, IDLE_LIMIT_MS);
   }
   var idleEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'click'];
+  // 2026-10-29 사용자 요청: 30분 자동 로그아웃 없앰 (다시 켜려면 아래 return 줄만 지우면 됨)
   function startIdleWatch() {
+    return;
     idleEvents.forEach(function (ev) { document.addEventListener(ev, resetIdleTimer); });
     resetIdleTimer();
   }
