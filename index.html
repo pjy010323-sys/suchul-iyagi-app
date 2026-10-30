@@ -921,7 +921,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261029092923">
+<meta name="app-build" content="20261030094042">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -8749,7 +8749,7 @@
   function resetIdleTimer() {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(async function () {
-      await sb.auth.signOut();
+      await sb.auth.signOut({ scope: 'local' });
       currentUser = null;
       showAuthScreen('30분 동안 사용이 없어서 자동으로 로그아웃됐어요. 다시 로그인해주세요.');
     }, IDLE_LIMIT_MS);
@@ -8880,7 +8880,7 @@
   });
 
   document.getElementById('pendingLogout').addEventListener('click', async function () {
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope: 'local' });
     currentUser = null;
     showAuthScreen();
   });
@@ -8894,7 +8894,7 @@
     }
   });
   document.getElementById('logoutBtn').addEventListener('click', async function () {
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope: 'local' });
     currentUser = null;
     showAuthScreen();
   });
@@ -8912,6 +8912,7 @@
     await loadManualBuyers();
     await maybeOfferLegacyImport();
     renderAll();
+    if (window.ldbAfterLogin) window.ldbAfterLogin();
   }
 
   // 이 컴퓨터(관리자 것)에 예전 버전이 쓰던 로컬 기록이 남아있고, 서버는 아직 비어있으면
@@ -9310,21 +9311,34 @@
     }
     async function flush() {
       clearTimeout(saveLead._t); clearTimeout(retryT);
-      var sent = Object.keys(pending).map(function (k) { var r = pending[k]; inflight[k] = true; return { row: toRow(r), ed: r._ed }; });
+      var sent = Object.keys(pending).map(function (k) { var r = pending[k]; inflight[k] = true; return { row: toRow(r), ed: r._ed, r: r }; });
       pending = {};
       if (!sent.length) return;
       var res;
       try { res = await sb.from('leads').upsert(sent.map(function (x) { return x.row; }), { onConflict: 'id' }); } catch (x) { res = { error: x }; }
       if (res.error) {
         console.error(res.error);
-        sent.forEach(function (x) { delete inflight[x.row.id]; var r = findLead(x.row.id); if (r && !pending[r.id]) pending[r.id] = r; });
-        setSync('⚠ 저장 실패 — 10초 뒤 다시 저장해요 (휴대폰에는 남아 있어요)');
+        sent.forEach(function (x) { delete inflight[x.row.id]; var r = findLead(x.row.id) || x.r; if (r && !pending[r.id]) pending[r.id] = r; });
+        // 2026-10-30: 로그인이 서버에서 끊기면(401) 10초 재시도를 하루 넘게 반복하며 아무도 몰랐음 → 바로 잡기
+        if (res.status === 401 || /jwt/i.test(String((res.error && res.error.message) || ''))) {
+          var rr; try { rr = await sb.auth.refreshSession(); } catch (x) { rr = { error: x }; }
+          if (rr && !rr.error && rr.data && rr.data.session) { setSync('로그인 다시 연결 — 저장 중…'); retryT = setTimeout(flush, 300); return; }
+          setSync('⛔ 로그인이 풀려서 저장이 안 되고 있어요 — 다시 로그인해 주세요');
+          pending = {};
+          if (!flush._warned) { flush._warned = true; alert('로그인이 풀려서 디비가 서버에 저장되지 않고 있어요.\n\n지금까지 입력한 내용은 이 기기에 남아 있어요.\n확인을 누르면 로그인 화면으로 가요. 다시 로그인하면 남은 디비를 자동으로 저장해요.'); }
+          try { await sb.auth.signOut({ scope: 'local' }); } catch (x) {}
+          leads = []; loadedFrom = null; serverHits = null; overlay.hidden = true;
+          currentUser = null; showAuthScreen('로그인이 풀렸어요. 다시 로그인하면 저장 안 된 디비를 자동으로 보내요.');
+          return;
+        }
+        setSync('⚠ 저장 실패 — 10초 뒤 다시 저장해요 (이 기기에는 남아 있어요)');
         retryT = setTimeout(flush, 10000);
         return;
       }
       var d = readDrafts();
       sent.forEach(function (x) { delete inflight[x.row.id]; if (d[x.row.id] && d[x.row.id]._ed === x.ed) delete d[x.row.id]; });
       writeDrafts(d);
+      flush._warned = false;
       if (Object.keys(pending).length) { saveLead._t = setTimeout(flush, 300); return; }
       var dt = new Date(); setSync('✔ 저장됨 ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()));
     }
@@ -9339,6 +9353,15 @@
       });
       if (ids.length) { setSync('저장 안 된 ' + ids.length + '건 다시 보내는 중…'); flush(); }
     }
+    // 2026-10-30: 로그인(또는 앱 시작) 직후 이 기기에 남은 저장 안 된 디비를 바로 보낸다
+    window.ldbAfterLogin = function () {
+      if (!currentUser) return;
+      var d = readDrafts(), ids = Object.keys(d);
+      if (!ids.length) return;
+      ids.forEach(function (id) { var r = fromRow(d[id]); r._ed = d[id]._ed; pending[id] = r; });
+      setSync('저장 안 된 ' + ids.length + '건 다시 보내는 중…');
+      flush().then(function () { if (!Object.keys(readDrafts()).length) toast('저장 안 됐던 디비 ' + ids.length + '건을 서버에 저장했어요'); });
+    };
     function busy(id) { return !!(pending[id] || inflight[id]); }
     async function removeLead(id) {
       leads = leads.filter(function (r) { return r.id !== id; });
