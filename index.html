@@ -822,6 +822,12 @@
   .ldb-btn[data-on="1"][data-k="bet"] { background: #0f766e; color: #fff; border-color: #0f766e; }
   .ldb-chip.nobet { background: #fef3c7; color: #92400e; }
   .ldb-btn[data-on="1"][data-k="bad"] { background: #6b7280; color: #fff; border-color: #6b7280; }
+  .ldb-ks { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 8px; font-size: 12.5px; }
+  .ldb-ks-st { color: var(--ink-muted); }
+  .ldb-ks-st.ok { color: #15803d; } .ldb-ks-st.warn { color: #c2410c; font-weight: 600; }
+  .ldb-ks-desc { font-size: 12.5px; line-height: 1.6; color: var(--ink-muted); margin-bottom: 6px; }
+  .ldb-kslock { font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1.5px solid #7c3aed; background: transparent; color: #7c3aed; cursor: pointer; }
+  .ldb-kstag { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #ede9fe; color: #6d28d9; white-space: nowrap; }
   .ldb-note { grid-column: 4; min-width: 130px; width: 100%; box-sizing: border-box; padding: 4px 7px; border: 1.5px solid var(--border); border-radius: 6px; font: inherit; font-size: 12.5px; resize: none; overflow: hidden; min-height: 26px; background: var(--surface); color: var(--ink); }
   .ldb-del { grid-column: 4; grid-row: 1; justify-self: end; font-size: 11.5px; padding: 3px 8px; color: #c8391f; border-color: #fdecea; background: #fdecea; }
   .ldb-specbtn { font-size: 11px; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
@@ -921,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261030094042">
+<meta name="app-build" content="20261031135115">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -1269,6 +1275,14 @@
 <div class="modal-overlay" id="leadsOverlay" hidden>
   <div class="modal leads-modal">
     <h2>📋 디비 정리 <span class="ldb-sync" id="ldbSync"></span></h2>
+    <div class="ldb-ks"><button type="button" class="btn-ghost" id="ldbKsBtn">🔗 KS 실시간 DB 연결</button><span class="ldb-ks-st" id="ldbKsSt"></span></div>
+    <div class="ldb-card" id="ldbKsBox" hidden>
+      <div class="ldb-ks-desc">KS 딜러사이트 아이디로 연결하면 <b>내 실시간 DB가 5분마다 여기로 자동으로</b> 들어와요.<br>
+        메모/성향 칸에 쓰면 KS 메모로도 저장되고, <b>🔒 잠금</b>도 여기서 할 수 있어요.<br>
+        비밀번호는 암호화해서 사무실 PC로 보내 로그인에만 쓰고 저장하지 않아요. 사무실 PC가 켜져 있어야 돌아가요.</div>
+      <div class="ldb-row"><input type="text" id="ldbKsId" placeholder="KS 아이디" autocomplete="off" autocapitalize="off"><input type="password" id="ldbKsPw" placeholder="KS 비밀번호" autocomplete="new-password"><button type="button" class="btn-accent" id="ldbKsLogin">연결</button></div>
+      <div class="ldb-row"><button type="button" class="btn-ghost" id="ldbKsSync">지금 가져오기</button><button type="button" class="btn-ghost" id="ldbKsOut">연결 끊기</button><span class="ldb-flash" id="ldbKsFlash"></span></div>
+    </div>
     <div class="ldb-card">
       <div class="ldb-open-pick">
         <b>오픈DB 붙여넣을 때:</b>
@@ -9292,7 +9306,7 @@
     function fromRow(x) {
       return { id: x.id, date: x.date, channel: x.channel || '', phone: fixPhone(x) || x.phone || '', car: x.car || '', memo: x.memo || '', name: x.name || '',
         source: x.source || 'kakao', status: x.status || 'none', contractDone: !!x.contract_done, isProspect: !!x.is_prospect, isBad: !!x.is_bad,
-        note: x.note || '', spec: x.spec || null, savedAt: Number(x.saved_at) || 0 };
+        note: x.note || '', spec: x.spec || null, savedAt: Number(x.saved_at) || 0, ks: x.ks || null };
     }
     // 2026-10-27 사용자: "스펙 딴 거 끄면 사라지는 경우" → ① 서버에 보내기 전에 기기(localStorage)에 먼저 저장, 다음에 열 때 되살려 다시 보냄
     //   ② 저장 실패하면 10초마다 다시 시도 ③ 보내는 중(inflight)·안 보낸 것은 서버 목록으로 덮어쓰지 않음 ④ 다른 앱으로 넘어가면 바로 저장
@@ -9304,7 +9318,7 @@
     function saveLead(r, now) {
       r._ed = Date.now();
       pending[r.id] = r;
-      var d = readDrafts(); d[r.id] = toRow(r); d[r.id]._ed = r._ed; writeDrafts(d);
+      var d = readDrafts(); d[r.id] = toRow(r); d[r.id]._ed = r._ed; d[r.id].ks = r.ks || null; writeDrafts(d);
       clearTimeout(saveLead._t);
       setSync('저장 중…');
       saveLead._t = setTimeout(flush, now ? 0 : 500);
@@ -9654,7 +9668,7 @@
           '<button type="button" class="btn-ghost ldb-specbtn" data-a="toggleSpec">' + (r.spec ? '📝 스펙 작성중' : '📝 스펙') + (openSpec[r.id] ? ' ▴' : ' ▾') + '</button>' +
           (r.memo ? '<small>' + esc(r.memo) + '</small>' : '') + '</span>' +
         '<button type="button" class="btn-ghost ldb-del" data-a="del">삭제</button>' +
-        '<div class="ldb-st">' + st('done', '통완', r.status === 'done') + st('absent', '부재', r.status === 'absent') + st('contract', '계약완료', r.contractDone) + st('callback', '재통예정', r.status === 'callback') + st('prospect', '가망', r.isProspect) + st('bad', '불량', r.isBad) + st('bet', '배팅', betOn(r)) + '</div>' +
+        '<div class="ldb-st">' + st('done', '통완', r.status === 'done') + st('absent', '부재', r.status === 'absent') + st('contract', '계약완료', r.contractDone) + st('callback', '재통예정', r.status === 'callback') + st('prospect', '가망', r.isProspect) + st('bad', '불량', r.isBad) + st('bet', '배팅', betOn(r)) + ksHtml(r) + '</div>' +
         '<textarea class="ldb-note" rows="1" placeholder="메모/성향">' + esc(r.note || '') + '</textarea>' +
         (openSpec[r.id] ? specHtml(r) : '') +
         '</div>';
@@ -9697,6 +9711,7 @@
       var cp = e.target.closest('[data-copy]'); if (cp && !e.target.closest('button')) { copy(cp.getAttribute('data-copy')); return; }
       var item = e.target.closest('.ldb-item'); if (!item) return;
       var r = findLead(item.getAttribute('data-id')); if (!r) return;
+      if (e.target.closest('[data-a="ksLock"]')) { ksLock(r); return; }
       var st = e.target.closest('.ldb-btn');
       if (st) {
         var k2 = st.getAttribute('data-k');
@@ -9764,7 +9779,10 @@
         refreshLive(item, r);
       }
     });
-    listEl.addEventListener('change', function (e) { if (e.target.getAttribute && e.target.getAttribute('data-me') === 'dests') render(); });
+    listEl.addEventListener('change', function (e) {
+      if (e.target.getAttribute && e.target.getAttribute('data-me') === 'dests') render();
+      if (e.target.classList && e.target.classList.contains('ldb-note')) { var it = e.target.closest('.ldb-item'), lr = it && findLead(it.getAttribute('data-id')); if (lr && lr.ks) ksMemo(lr); }
+    });
     listEl.addEventListener('keyup', function (e) { if (isEnterKey(e) && e.target.classList.contains('ldb-note')) e.target.blur(); });
     listEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && e.target.classList.contains('ldb-note')) e.preventDefault(); });
     chipsEl.addEventListener('click', function (e) {
@@ -9849,6 +9867,94 @@
       a.href = URL.createObjectURL(blob); a.download = '디비정리백업_' + dayKey() + '.json'; document.body.appendChild(a); a.click(); a.remove();
     });
 
+    // ---------- KS 실시간 DB 연동 (2026-10-31) ----------
+    // 사장님: "내 키워드 들어오는 실시간 DB를 앱에서 메모·잠금, 개인마다 로그인". 사무실 PC(블로그 자동화)가 직원별 KS 로그인을 유지하며
+    // 5분마다 실시간 DB 를 leads 에 넣고(ks 칸에 KS 글 번호), 여기서 쌓은 ks_requests(메모·잠금)를 KS 에 대신 반영한다.
+    var ksLink = null, ksRt = null, ksUid = null;
+    function ksHtml(r) {
+      if (!r.ks) return '';
+      if (r.ks.locked) return '<span class="ldb-kstag" title="KS에서 잠근 문의">🔒 잠김</span>';
+      return '<button type="button" class="ldb-kslock" data-a="ksLock" title="KS 실시간 DB에서 이 문의를 잠가요">🔒 잠금</button>';
+    }
+    function ksFlash(m) { var f = $('ldbKsFlash'); if (!f) return; f.textContent = m; clearTimeout(ksFlash._t); ksFlash._t = setTimeout(function () { f.textContent = ''; }, 6000); }
+    function hm(t) { var d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+    function ksShow() {
+      var el = $('ldbKsSt'), btn = $('ldbKsBtn'), l = ksLink || { status: 'none' };
+      var stale = l.status === 'ok' && l.last_sync && Date.now() - new Date(l.last_sync).getTime() > 15 * 60e3;
+      el.className = 'ldb-ks-st' + (l.status === 'ok' && !stale ? ' ok' : l.status === 'none' ? '' : ' warn');
+      if (l.status === 'ok') el.textContent = stale ? '⚠ ' + hm(l.last_sync) + ' 이후로 못 가져왔어요 — 사무실 PC가 꺼져 있는지 확인해 주세요'
+        : '✔ 연결됨' + (l.ks_user ? ' (' + l.ks_user + ')' : '') + (l.last_sync ? ' · ' + hm(l.last_sync) + ' 확인' : '') + (l.message ? ' · ' + l.message : '');
+      else if (l.status === 'expired' || l.status === 'error') el.textContent = '⚠ ' + (l.message || '연결이 끊겼어요') + ' — 눌러서 다시 연결';
+      else el.textContent = '';
+      btn.textContent = l.status === 'ok' ? '🔗 KS 연결 관리' : '🔗 KS 실시간 DB 연결';
+      $('ldbKsSync').hidden = $('ldbKsOut').hidden = l.status !== 'ok';
+      if (l.ks_user && !$('ldbKsId').value) $('ldbKsId').value = l.ks_user;
+    }
+    async function ksInit() {
+      if (!currentUser) return;
+      if (ksUid !== currentUser.id) { ksStop(); ksUid = currentUser.id; }
+      var res = await sb.from('ks_links').select('*').eq('user_id', currentUser.id).maybeSingle();
+      if (res.error) { console.warn('KS 연결 상태', res.error); $('ldbKsBtn').hidden = true; return; } // 서버 준비 전
+      $('ldbKsBtn').hidden = false;
+      ksLink = res.data; ksShow();
+      if (ksRt) return;
+      try {
+        ksRt = sb.channel('ks-' + currentUser.id)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ks_links', filter: 'user_id=eq.' + currentUser.id }, function (p) { if (p.new) { ksLink = p.new; ksShow(); } })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ks_requests', filter: 'user_id=eq.' + currentUser.id }, function (p) {
+            var q = p.new; if (!q || q.status === 'pending') return;
+            var err = q.status === 'error' ? ((q.result && q.result.error) || '실패') : '';
+            if (q.kind === 'login') { if (err) ksFlash('⚠ 연결 실패: ' + err); else { ksFlash('✔ 연결됐어요' + (q.result && q.result.added ? ' — 새 문의 ' + q.result.added + '건' : '')); $('ldbKsBox').hidden = true; } }
+            else if (q.kind === 'lock') toast(err ? '⚠ 잠금 실패: ' + err : '🔒 잠금 완료');
+            else if (q.kind === 'memo') toast(err ? '⚠ KS 메모 실패: ' + err : 'KS 메모에도 저장됐어요');
+            else if (q.kind === 'sync') ksFlash(err ? '⚠ ' + err : '✔ 가져오기 끝');
+          }).subscribe();
+      } catch (e) { console.warn('KS 실시간 연결 실패', e); }
+      clearInterval(ksInit._t); ksInit._t = setInterval(function () { if (!overlay.hidden) ksShow(); }, 60e3);
+    }
+    function ksStop() { if (ksRt) { try { sb.removeChannel(ksRt); } catch (x) {} ksRt = null; } ksLink = null; ksUid = null; clearInterval(ksInit._t); }
+    async function ksReq(kind, leadId, payload) {
+      var res = await sb.from('ks_requests').insert({ kind: kind, lead_id: leadId || null, payload: payload || null });
+      if (res.error) { alert('KS 요청을 못 보냈어요: ' + res.error.message); return false; }
+      return true;
+    }
+    function ksOn() { return ksLink && ksLink.status === 'ok'; }
+    function ksMemo(r) {
+      if (!ksOn()) { toast('KS 연결이 안 돼 있어서 앱에만 저장했어요'); return; }
+      var t = String(r.note || '').trim();
+      if (r._ksSent === t || (!t && !r.ks.memoIdx)) return; // 바뀐 게 없으면 안 보냄
+      r._ksSent = t; ksReq('memo', r.id, { text: t });
+    }
+    function ksLock(r) {
+      if (!ksOn()) { alert('KS 연결이 안 돼 있어요. 위의 "🔗 KS 실시간 DB 연결"부터 해 주세요.'); return; }
+      askConfirm('이 문의를 잠글까요?\n\n' + (r.car || '') + ' ' + (r.phone || '')).then(function (ok) {
+        if (!ok) return;
+        ksReq('lock', r.id).then(function (sent) { if (sent) toast('🔒 잠그는 중… (10초쯤 걸려요)'); });
+      });
+    }
+    function b64(buf) { var s = '', a = new Uint8Array(buf); for (var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); }
+    $('ldbKsBtn').addEventListener('click', function () { $('ldbKsBox').hidden = !$('ldbKsBox').hidden; if (!$('ldbKsBox').hidden) (($('ldbKsId').value ? $('ldbKsPw') : $('ldbKsId'))).focus(); });
+    $('ldbKsSt').addEventListener('click', function () { if (ksLink && ksLink.status !== 'ok') { $('ldbKsBox').hidden = false; $('ldbKsPw').focus(); } });
+    $('ldbKsLogin').addEventListener('click', async function () {
+      var id = $('ldbKsId').value.trim(), pw = $('ldbKsPw').value;
+      if (!id || !pw) { ksFlash('아이디와 비밀번호를 넣어 주세요'); return; }
+      if (!(window.crypto && crypto.subtle)) { alert('이 기기에서는 암호화를 못 해서 연결할 수 없어요. 다른 기기(휴대폰 앱)에서 해 주세요.'); return; }
+      var k = await sb.from('ks_bridge_conf').select('value').eq('name', 'pubkey').maybeSingle();
+      if (k.error || !k.data) { alert('사무실 PC가 아직 준비되지 않았어요. 사장님께 말씀해 주세요.'); return; }
+      try {
+        var raw = Uint8Array.from(atob(k.data.value), function (c) { return c.charCodeAt(0); });
+        var key = await crypto.subtle.importKey('spki', raw, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+        var enc = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, key, new TextEncoder().encode(JSON.stringify({ id: id, pw: pw })));
+        $('ldbKsPw').value = '';
+        if (await ksReq('login', null, { enc: b64(enc) })) ksFlash('연결하는 중… (10~30초)');
+      } catch (e) { alert('연결 준비 중 오류: ' + e.message); }
+    });
+    $('ldbKsPw').addEventListener('keyup', function (e) { if (isEnterKey(e)) $('ldbKsLogin').click(); });
+    $('ldbKsSync').addEventListener('click', function () { ksReq('sync').then(function (ok) { if (ok) ksFlash('가져오는 중…'); }); });
+    $('ldbKsOut').addEventListener('click', function () {
+      askConfirm('KS 연결을 끊을까요? 실시간 DB가 더 이상 자동으로 들어오지 않아요.').then(function (ok) { if (ok) ksReq('logout').then(function (s) { if (s) ksFlash('끊는 중…'); }); });
+    });
+
     // ---------- 열기·닫기 ----------
     var ownerId = null;
     async function openLeads() {
@@ -9861,7 +9967,7 @@
       overlay.hidden = false; renderOpenPick();
       if (!loadedFrom) { listEl.innerHTML = '<div class="ldb-empty">불러오는 중…</div>'; if (await load(daysAgo(PAGE_DAYS))) { restoreDrafts(); render(); olderExists(); } else { restoreDrafts(); render(); } }
       else { await load(loadedFrom); restoreDrafts(); render(); }
-      subscribe();
+      subscribe(); ksInit();
       if (window.innerWidth > 700) pasteEl.focus();
     }
     function closeLeads() { flush(); overlay.hidden = true; quoteOverlay.style.zIndex = ''; }
@@ -9877,7 +9983,7 @@
       if (!overlay.hidden && loadedFrom) flush().then(function () { return load(loadedFrom); }).then(render);
     });
     // 로그아웃하면 화면에 남은 문의를 비운다 (다른 사람이 로그인해도 안 보이게)
-    document.getElementById('logoutBtn').addEventListener('click', function () { leads = []; loadedFrom = null; serverHits = null; memSend = {}; if (rt) { try { sb.removeChannel(rt); } catch (x) {} rt = null; } overlay.hidden = true; });
+    document.getElementById('logoutBtn').addEventListener('click', function () { ksStop(); leads = []; loadedFrom = null; serverHits = null; memSend = {}; if (rt) { try { sb.removeChannel(rt); } catch (x) {} rt = null; } overlay.hidden = true; });
   })();
 
   // ===== 휴지통 (1·2단계) · 직원 디비 현황 (1단계) · 1단계 주간 자동 백업 — 2026-10-20 =====
