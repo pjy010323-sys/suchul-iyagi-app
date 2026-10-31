@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261031135115">
+<meta name="app-build" content="20261031142102">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -1275,12 +1275,14 @@
 <div class="modal-overlay" id="leadsOverlay" hidden>
   <div class="modal leads-modal">
     <h2>📋 디비 정리 <span class="ldb-sync" id="ldbSync"></span></h2>
-    <div class="ldb-ks"><button type="button" class="btn-ghost" id="ldbKsBtn">🔗 KS 실시간 DB 연결</button><span class="ldb-ks-st" id="ldbKsSt"></span></div>
+    <div class="ldb-ks"><button type="button" class="btn-ghost" id="ldbKsBtn">🔗 실시간 DB 연결</button><span class="ldb-ks-st" id="ldbKsSt"></span></div>
     <div class="ldb-card" id="ldbKsBox" hidden>
-      <div class="ldb-ks-desc">KS 딜러사이트 아이디로 연결하면 <b>내 실시간 DB가 5분마다 여기로 자동으로</b> 들어와요.<br>
-        메모/성향 칸에 쓰면 KS 메모로도 저장되고, <b>🔒 잠금</b>도 여기서 할 수 있어요.<br>
+      <div class="ldb-ks-desc">딜러사이트 아이디로 연결하면 <b>내 실시간 DB가 5분마다 여기로 자동으로</b> 들어와요.<br>
+        <b>3개 한 번에</b>를 고르면 아이디(끝에 1 붙은 것도 OK)·비밀번호 한 번으로 KS·국민·H를 다 연결해요.<br>
+        메모/성향 칸에 쓰면 그 사이트 메모로도 저장되고, <b>🔒 잠금</b>도 여기서 할 수 있어요.<br>
         비밀번호는 암호화해서 사무실 PC로 보내 로그인에만 쓰고 저장하지 않아요. 사무실 PC가 켜져 있어야 돌아가요.</div>
-      <div class="ldb-row"><input type="text" id="ldbKsId" placeholder="KS 아이디" autocomplete="off" autocapitalize="off"><input type="password" id="ldbKsPw" placeholder="KS 비밀번호" autocomplete="new-password"><button type="button" class="btn-accent" id="ldbKsLogin">연결</button></div>
+      <div class="ldb-dests" id="ldbKsSites"><button type="button" class="ldb-dest" data-site="all">3개 한 번에</button><button type="button" class="ldb-dest" data-site="ks">KS</button><button type="button" class="ldb-dest" data-site="kukmin">국민</button><button type="button" class="ldb-dest" data-site="h">H중고차</button></div>
+      <div class="ldb-row"><input type="text" id="ldbKsId" placeholder="아이디" autocomplete="off" autocapitalize="off"><input type="password" id="ldbKsPw" placeholder="비밀번호" autocomplete="new-password"><button type="button" class="btn-accent" id="ldbKsLogin">연결</button></div>
       <div class="ldb-row"><button type="button" class="btn-ghost" id="ldbKsSync">지금 가져오기</button><button type="button" class="btn-ghost" id="ldbKsOut">연결 끊기</button><span class="ldb-flash" id="ldbKsFlash"></span></div>
     </div>
     <div class="ldb-card">
@@ -9867,76 +9869,101 @@
       a.href = URL.createObjectURL(blob); a.download = '디비정리백업_' + dayKey() + '.json'; document.body.appendChild(a); a.click(); a.remove();
     });
 
-    // ---------- KS 실시간 DB 연동 (2026-10-31) ----------
+    // ---------- 딜러사이트 실시간 DB 연동 (2026-10-31) ----------
     // 사장님: "내 키워드 들어오는 실시간 DB를 앱에서 메모·잠금, 개인마다 로그인". 사무실 PC(블로그 자동화)가 직원별 KS 로그인을 유지하며
     // 5분마다 실시간 DB 를 leads 에 넣고(ks 칸에 KS 글 번호), 여기서 쌓은 ks_requests(메모·잠금)를 KS 에 대신 반영한다.
-    var ksLink = null, ksRt = null, ksUid = null;
+    // 2026-10-31 오후: 국민·H 도 같은 회사 사이트라 같이 붙임 — 사이트 = ks / kukmin / h, 연결 상태는 사이트마다 따로
+    var KS_SITES = { ks: 'KS', kukmin: '국민', h: 'H중고차' };
+    var ksLinks = {}, ksRt = null, ksUid = null, ksPick = 'all';
+    function siteName(s) { return s === 'all' ? '3개 사이트' : KS_SITES[s || 'ks'] || 'KS'; }
     function ksHtml(r) {
       if (!r.ks) return '';
-      if (r.ks.locked) return '<span class="ldb-kstag" title="KS에서 잠근 문의">🔒 잠김</span>';
-      return '<button type="button" class="ldb-kslock" data-a="ksLock" title="KS 실시간 DB에서 이 문의를 잠가요">🔒 잠금</button>';
+      if (r.ks.locked) return '<span class="ldb-kstag" title="' + siteName(r.ks.site) + '에서 잠근 문의">🔒 잠김</span>';
+      return '<button type="button" class="ldb-kslock" data-a="ksLock" title="' + siteName(r.ks.site) + ' 실시간 DB에서 이 문의를 잠가요">🔒 잠금</button>';
     }
     function ksFlash(m) { var f = $('ldbKsFlash'); if (!f) return; f.textContent = m; clearTimeout(ksFlash._t); ksFlash._t = setTimeout(function () { f.textContent = ''; }, 6000); }
     function hm(t) { var d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+    function ksStale(l) { return l.status === 'ok' && l.last_sync && Date.now() - new Date(l.last_sync).getTime() > 15 * 60e3; }
     function ksShow() {
-      var el = $('ldbKsSt'), btn = $('ldbKsBtn'), l = ksLink || { status: 'none' };
-      var stale = l.status === 'ok' && l.last_sync && Date.now() - new Date(l.last_sync).getTime() > 15 * 60e3;
-      el.className = 'ldb-ks-st' + (l.status === 'ok' && !stale ? ' ok' : l.status === 'none' ? '' : ' warn');
-      if (l.status === 'ok') el.textContent = stale ? '⚠ ' + hm(l.last_sync) + ' 이후로 못 가져왔어요 — 사무실 PC가 꺼져 있는지 확인해 주세요'
-        : '✔ 연결됨' + (l.ks_user ? ' (' + l.ks_user + ')' : '') + (l.last_sync ? ' · ' + hm(l.last_sync) + ' 확인' : '') + (l.message ? ' · ' + l.message : '');
-      else if (l.status === 'expired' || l.status === 'error') el.textContent = '⚠ ' + (l.message || '연결이 끊겼어요') + ' — 눌러서 다시 연결';
-      else el.textContent = '';
-      btn.textContent = l.status === 'ok' ? '🔗 KS 연결 관리' : '🔗 KS 실시간 DB 연결';
-      $('ldbKsSync').hidden = $('ldbKsOut').hidden = l.status !== 'ok';
-      if (l.ks_user && !$('ldbKsId').value) $('ldbKsId').value = l.ks_user;
+      var el = $('ldbKsSt'), parts = [], warn = false, any = false;
+      Object.keys(KS_SITES).forEach(function (s) {
+        var l = ksLinks[s]; if (!l || l.status === 'none') return;
+        any = true;
+        if (l.status === 'ok' && !ksStale(l)) parts.push('✔ ' + siteName(s) + (l.last_sync ? ' ' + hm(l.last_sync) : ''));
+        else { warn = true; parts.push('⚠ ' + siteName(s) + ' ' + (l.status === 'ok' ? hm(l.last_sync) + ' 이후로 못 가져옴 — 사무실 PC 확인' : l.status === 'expired' ? '로그인 풀림 — 눌러서 다시 연결' : '연결 실패 — 눌러서 다시 연결')); }
+      });
+      el.className = 'ldb-ks-st' + (warn ? ' warn' : any ? ' ok' : '');
+      el.textContent = parts.join(' · ');
+      $('ldbKsBtn').textContent = any ? '🔗 연결 관리' : '🔗 실시간 DB 연결';
+      $('ldbKsSites').querySelectorAll('[data-site]').forEach(function (b) {
+        var s = b.getAttribute('data-site'), l = ksLinks[s];
+        b.setAttribute('data-on', s === ksPick ? '1' : '0');
+        if (s !== 'all') b.textContent = siteName(s) + (l && l.status === 'ok' ? ' ✔' : l && l.status !== 'none' ? ' ⚠' : '');
+      });
+      var cur = ksLinks[ksPick];
+      $('ldbKsSync').hidden = $('ldbKsOut').hidden = !(cur && cur.status === 'ok');
+      $('ldbKsId').placeholder = siteName(ksPick) + ' 아이디'; $('ldbKsPw').placeholder = siteName(ksPick) + ' 비밀번호';
+      $('ldbKsLogin').textContent = siteName(ksPick) + ' 연결';
     }
+    function ksPickSite(s) { ksPick = s; var l = ksLinks[s] || ksLinks.ks || ksLinks.kukmin || ksLinks.h; $('ldbKsId').value = (l && l.ks_user) || ''; $('ldbKsPw').value = ''; ksShow(); }
     async function ksInit() {
       if (!currentUser) return;
       if (ksUid !== currentUser.id) { ksStop(); ksUid = currentUser.id; }
-      var res = await sb.from('ks_links').select('*').eq('user_id', currentUser.id).maybeSingle();
-      if (res.error) { console.warn('KS 연결 상태', res.error); $('ldbKsBtn').hidden = true; return; } // 서버 준비 전
+      var res = await sb.from('ks_links').select('*').eq('user_id', currentUser.id);
+      if (res.error) { console.warn('연결 상태', res.error); $('ldbKsBtn').hidden = true; return; } // 서버 준비 전
       $('ldbKsBtn').hidden = false;
-      ksLink = res.data; ksShow();
+      ksLinks = {}; (res.data || []).forEach(function (l) { ksLinks[l.site || 'ks'] = l; });
+      ksPickSite(ksPick);
       if (ksRt) return;
       try {
         ksRt = sb.channel('ks-' + currentUser.id)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'ks_links', filter: 'user_id=eq.' + currentUser.id }, function (p) { if (p.new) { ksLink = p.new; ksShow(); } })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ks_links', filter: 'user_id=eq.' + currentUser.id }, function (p) { if (p.new) { ksLinks[p.new.site || 'ks'] = p.new; ksShow(); } })
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ks_requests', filter: 'user_id=eq.' + currentUser.id }, function (p) {
-            var q = p.new; if (!q || q.status === 'pending') return;
-            var err = q.status === 'error' ? ((q.result && q.result.error) || '실패') : '';
-            if (q.kind === 'login') { if (err) ksFlash('⚠ 연결 실패: ' + err); else { ksFlash('✔ 연결됐어요' + (q.result && q.result.added ? ' — 새 문의 ' + q.result.added + '건' : '')); $('ldbKsBox').hidden = true; } }
+            var q = p.new; if (!q || q.status === 'pending' || (q.result && q.result.skipped)) return;
+            var err = q.status === 'error' ? ((q.result && q.result.error) || '실패') : '', nm = siteName(q.site);
+            if (q.kind === 'login') {
+              var per = q.result && q.result.sites ? Object.keys(q.result.sites).map(function (k) { return siteName(k) + (q.result.sites[k] === 'ok' ? ' ✔' : ' ⚠ ' + q.result.sites[k].replace(/^실패: /, '')); }).join(' · ') : '';
+              ksFlash(err ? '⚠ ' + nm + ' 연결 실패: ' + err : (per || '✔ ' + nm + ' 연결됐어요') + (q.result && q.result.added ? ' — 새 문의 ' + q.result.added + '건' : ''));
+              clearTimeout(ksFlash._t); ksFlash._t = setTimeout(function () { $('ldbKsFlash').textContent = ''; }, 20000);
+            }
             else if (q.kind === 'lock') toast(err ? '⚠ 잠금 실패: ' + err : '🔒 잠금 완료');
-            else if (q.kind === 'memo') toast(err ? '⚠ KS 메모 실패: ' + err : 'KS 메모에도 저장됐어요');
-            else if (q.kind === 'sync') ksFlash(err ? '⚠ ' + err : '✔ 가져오기 끝');
+            else if (q.kind === 'memo') toast(err ? '⚠ 사이트 메모 실패: ' + err : '사이트 메모에도 저장됐어요');
+            else if (q.kind === 'sync') ksFlash(err ? '⚠ ' + err : '✔ ' + nm + ' 가져오기 끝');
           }).subscribe();
-      } catch (e) { console.warn('KS 실시간 연결 실패', e); }
+      } catch (e) { console.warn('실시간 연결 실패', e); }
       clearInterval(ksInit._t); ksInit._t = setInterval(function () { if (!overlay.hidden) ksShow(); }, 60e3);
     }
-    function ksStop() { if (ksRt) { try { sb.removeChannel(ksRt); } catch (x) {} ksRt = null; } ksLink = null; ksUid = null; clearInterval(ksInit._t); }
-    async function ksReq(kind, leadId, payload) {
-      var res = await sb.from('ks_requests').insert({ kind: kind, lead_id: leadId || null, payload: payload || null });
-      if (res.error) { alert('KS 요청을 못 보냈어요: ' + res.error.message); return false; }
+    function ksStop() { if (ksRt) { try { sb.removeChannel(ksRt); } catch (x) {} ksRt = null; } ksLinks = {}; ksUid = null; clearInterval(ksInit._t); }
+    async function ksReq(kind, leadId, payload, site) {
+      var res = await sb.from('ks_requests').insert({ kind: kind, site: site || 'ks', lead_id: leadId || null, payload: payload || null });
+      if (res.error) { alert('요청을 못 보냈어요: ' + res.error.message); return false; }
       return true;
     }
-    function ksOn() { return ksLink && ksLink.status === 'ok'; }
+    function ksOn(s) { var l = ksLinks[s || 'ks']; return l && l.status === 'ok'; }
     function ksMemo(r) {
-      if (!ksOn()) { toast('KS 연결이 안 돼 있어서 앱에만 저장했어요'); return; }
+      var s = r.ks.site || 'ks';
+      if (!ksOn(s)) { toast(siteName(s) + ' 연결이 안 돼 있어서 앱에만 저장했어요'); return; }
       var t = String(r.note || '').trim();
       if (r._ksSent === t || (!t && !r.ks.memoIdx)) return; // 바뀐 게 없으면 안 보냄
-      r._ksSent = t; ksReq('memo', r.id, { text: t });
+      r._ksSent = t; ksReq('memo', r.id, { text: t }, s);
     }
     function ksLock(r) {
-      if (!ksOn()) { alert('KS 연결이 안 돼 있어요. 위의 "🔗 KS 실시간 DB 연결"부터 해 주세요.'); return; }
+      var s = r.ks.site || 'ks';
+      if (!ksOn(s)) { alert(siteName(s) + ' 연결이 안 돼 있어요. 위의 "🔗 연결"에서 ' + siteName(s) + '부터 연결해 주세요.'); return; }
       askConfirm('이 문의를 잠글까요?\n\n' + (r.car || '') + ' ' + (r.phone || '')).then(function (ok) {
         if (!ok) return;
-        ksReq('lock', r.id).then(function (sent) { if (sent) toast('🔒 잠그는 중… (10초쯤 걸려요)'); });
+        ksReq('lock', r.id, null, s).then(function (sent) { if (sent) toast('🔒 잠그는 중… (10초쯤 걸려요)'); });
       });
     }
     function b64(buf) { var s = '', a = new Uint8Array(buf); for (var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); }
     $('ldbKsBtn').addEventListener('click', function () { $('ldbKsBox').hidden = !$('ldbKsBox').hidden; if (!$('ldbKsBox').hidden) (($('ldbKsId').value ? $('ldbKsPw') : $('ldbKsId'))).focus(); });
-    $('ldbKsSt').addEventListener('click', function () { if (ksLink && ksLink.status !== 'ok') { $('ldbKsBox').hidden = false; $('ldbKsPw').focus(); } });
+    $('ldbKsSt').addEventListener('click', function () {
+      var bad = Object.keys(KS_SITES).filter(function (s) { return ksLinks[s] && ksLinks[s].status !== 'ok' && ksLinks[s].status !== 'none'; })[0];
+      if (bad) { ksPickSite(bad); $('ldbKsBox').hidden = false; $('ldbKsPw').focus(); }
+    });
+    $('ldbKsSites').addEventListener('click', function (e) { var b = e.target.closest('[data-site]'); if (b) { ksPickSite(b.getAttribute('data-site')); $('ldbKsId').focus(); } });
     $('ldbKsLogin').addEventListener('click', async function () {
-      var id = $('ldbKsId').value.trim(), pw = $('ldbKsPw').value;
+      var id = $('ldbKsId').value.trim(), pw = $('ldbKsPw').value, s = ksPick;
       if (!id || !pw) { ksFlash('아이디와 비밀번호를 넣어 주세요'); return; }
       if (!(window.crypto && crypto.subtle)) { alert('이 기기에서는 암호화를 못 해서 연결할 수 없어요. 다른 기기(휴대폰 앱)에서 해 주세요.'); return; }
       var k = await sb.from('ks_bridge_conf').select('value').eq('name', 'pubkey').maybeSingle();
@@ -9946,13 +9973,14 @@
         var key = await crypto.subtle.importKey('spki', raw, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
         var enc = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, key, new TextEncoder().encode(JSON.stringify({ id: id, pw: pw })));
         $('ldbKsPw').value = '';
-        if (await ksReq('login', null, { enc: b64(enc) })) ksFlash('연결하는 중… (10~30초)');
+        if (await ksReq('login', null, { enc: b64(enc) }, s)) ksFlash(siteName(s) + ' 연결하는 중… (10~30초)');
       } catch (e) { alert('연결 준비 중 오류: ' + e.message); }
     });
     $('ldbKsPw').addEventListener('keyup', function (e) { if (isEnterKey(e)) $('ldbKsLogin').click(); });
-    $('ldbKsSync').addEventListener('click', function () { ksReq('sync').then(function (ok) { if (ok) ksFlash('가져오는 중…'); }); });
+    $('ldbKsSync').addEventListener('click', function () { var s = ksPick; ksReq('sync', null, null, s).then(function (ok) { if (ok) ksFlash(siteName(s) + ' 가져오는 중…'); }); });
     $('ldbKsOut').addEventListener('click', function () {
-      askConfirm('KS 연결을 끊을까요? 실시간 DB가 더 이상 자동으로 들어오지 않아요.').then(function (ok) { if (ok) ksReq('logout').then(function (s) { if (s) ksFlash('끊는 중…'); }); });
+      var s = ksPick;
+      askConfirm(siteName(s) + ' 연결을 끊을까요? 실시간 DB가 더 이상 자동으로 들어오지 않아요.').then(function (ok) { if (ok) ksReq('logout', null, null, s).then(function (x) { if (x) ksFlash('끊는 중…'); }); });
     });
 
     // ---------- 열기·닫기 ----------
