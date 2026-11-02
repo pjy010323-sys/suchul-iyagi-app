@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261031143715">
+<meta name="app-build" content="20261102135205">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -1279,7 +1279,7 @@
     <div class="ldb-card" id="ldbKsBox" hidden>
       <div class="ldb-ks-desc">딜러사이트 아이디로 연결하면 <b>내 실시간 DB가 5분마다 여기로 자동으로</b> 들어와요.<br>
         <b>3개 한 번에</b>를 고르면 아이디(끝에 1 붙은 것도 OK)·비밀번호 한 번으로 KS·국민·H를 다 연결해요.<br>
-        스펙의 <b>② 메모</b> 칸에 쓰면 그 사이트 메모로도 저장되고, <b>🔒 잠금</b>도 여기서 할 수 있어요.<br>
+        스펙의 <b>🔗 오픈사이트 메모</b> 칸에 쓰면 그 사이트 메모로 저장되고(② 메모는 앱에만), <b>🔒 잠금</b>도 여기서 할 수 있어요.<br>
         비밀번호는 암호화해서 사무실 PC로 보내 로그인에만 쓰고 저장하지 않아요. 사무실 PC가 켜져 있어야 돌아가요.</div>
       <div class="ldb-dests" id="ldbKsSites"><button type="button" class="ldb-dest" data-site="all">3개 한 번에</button><button type="button" class="ldb-dest" data-site="ks">KS</button><button type="button" class="ldb-dest" data-site="kukmin">국민</button><button type="button" class="ldb-dest" data-site="h">H중고차</button></div>
       <div class="ldb-row"><input type="text" id="ldbKsId" placeholder="아이디" autocomplete="off" autocapitalize="off"><input type="password" id="ldbKsPw" placeholder="비밀번호" autocomplete="new-password"><button type="button" class="btn-accent" id="ldbKsLogin">연결</button></div>
@@ -1303,6 +1303,7 @@
     <div class="ldb-tabs" id="ldbTabs">
       <button type="button" class="btn-ghost ldb-tab" data-view="all">전체</button>
       <button type="button" class="btn-ghost ldb-tab" data-view="kakao">카톡 문의</button>
+      <button type="button" class="btn-ghost ldb-tab" data-view="kw">우리 키워드</button>
       <button type="button" class="btn-ghost ldb-tab" data-view="open">오픈DB</button>
     </div>
     <div class="ldb-row" style="margin-top:0">
@@ -9595,6 +9596,7 @@
         var tags = [ST[r.status] || '미통화'].concat(r.contractDone ? ['계약완료'] : [], r.isProspect ? ['가망'] : [], r.isBad ? ['불량'] : []).join('·');
         var lines = [shortCh(r.channel), ''].concat(SPEC_A.map(function (f) { return f[1] + ' : ' + (s[f[0]] || ''); }));
         if (String(s.buyers || '').trim()) lines.push(String(s.buyers).trim());
+        if (r.ks && String(s.siteMemo || '').trim() && s.siteMemo !== s.buyers) lines.push('사이트메모: ' + String(s.siteMemo).trim());
         if (String(r.note || '').trim()) lines.push(String(r.note).trim());
         lines.push(tags + ' · ' + (betOn(r) ? (String(s.bet || '').trim() ? betLabel(s.bet) : '배팅함') : '배팅 안 함'));
         return lines.concat(LINE).join('\n');
@@ -9629,7 +9631,9 @@
         '<div><h4>① 스펙</h4>' + ((r.spec && r.spec.direct) || !r.channel ? chHtml(r) : '') + inp(['header', '제목'], s.header) + SPEC_A.map(function (f) { return inp(f, s[f[0]]); }).join('') + '</div>' +
         '<div><h4>💡 바로 견적 <span class="ldb-qq-sub">판매 기록 기준 · 적는 대로 바뀌어요</span></h4><div class="ldb-qq" data-qq>' + qqHtml(r) + '</div>' +
         '<div class="ldb-f" style="margin-top:10px"><label>💰 배팅금액</label><input type="text" data-f="bet" value="' + esc(s.bet || '') + '" placeholder="숫자만 (만원, 예: 120)"></div>' +
-        '<h4 style="margin-top:10px">② 메모' + (r.ks ? ' <span class="ldb-qq-sub" style="color:#7c3aed;font-weight:600">🔗 ' + siteName(r.ks.site) + ' 오픈사이트에 자동 저장돼요</span>' : '') + '</h4><div class="ldb-f"><textarea data-f="buyers" rows="6" placeholder="통화하면서 들은 내용, 바이어 견적 등' + (r.ks ? ' (다 쓰고 칸 밖을 누르면 오픈사이트 메모로 저장)' : '') + '">' + esc(s.buyers || '') + '</textarea></div>' +
+        '<h4 style="margin-top:10px">② 메모</h4><div class="ldb-f"><textarea data-f="buyers" rows="6" placeholder="통화하면서 들은 내용, 바이어 견적 등 (앱에만 저장)">' + esc(s.buyers || '') + '</textarea></div>' +
+        // 2026-11-02 사용자: 스펙 따면서 메모 적을 곳이 없어서 → ② 메모는 앱 전용, 오픈사이트 메모는 이 칸만
+        (r.ks ? '<h4 style="margin-top:10px">🔗 ' + siteName(r.ks.site) + ' 오픈사이트 메모 <span class="ldb-qq-sub" style="color:#7c3aed;font-weight:600">이 칸만 사이트에 저장돼요</span></h4><div class="ldb-f"><textarea data-f="siteMemo" rows="3" placeholder="오픈사이트에 남길 메모 (다 쓰고 칸 밖을 누르면 저장)">' + esc(siteMemoOf(r)) + '</textarea></div>' : '') + '' +
         (openSend[r.id] ? '<h4 style="margin-top:10px">③ 송금 요청 (매입하는 차만)</h4>' + SEND.map(function (f) { return inp(f, t[f[0]], PH[f[0]]); }).join('') : '') +
         (openTak[r.id] ? takHtml(r, s, inp) : '') + '</div>' +
         '</div><div class="ldb-acts">' +
@@ -9679,7 +9683,7 @@
       overlay.querySelectorAll('.ldb-tab').forEach(function (b) { b.setAttribute('data-active', b.getAttribute('data-view') === view ? '1' : '0'); });
       var base = serverHits || leads;
       var q = (searchEl.value || '').trim().toLowerCase();
-      var list = base.filter(function (r) { return view === 'open' ? isOpen(r) : view === 'kakao' ? !isOpen(r) : true; });
+      var list = base.filter(function (r) { return view === 'open' ? isOpen(r) : view === 'kw' ? !isOpen(r) && !!r.ks : view === 'kakao' ? !isOpen(r) && !r.ks : true; });
       if (q && !serverHits) list = list.filter(function (r) { var sp = r.spec ? Object.keys(r.spec).map(function (k) { return r.spec[k]; }).join(' ') : ''; return [r.channel, r.phone, r.car, r.memo, r.name, r.note, sp].join(' ').toLowerCase().indexOf(q) >= 0; });
       var cnt = function (fn) { return list.filter(fn).length; };
       var F = { done: function (r) { return r.status === 'done'; }, absent: function (r) { return r.status === 'absent'; }, callback: function (r) { return r.status === 'callback'; }, none: function (r) { return r.status === 'none'; }, contract: function (r) { return r.contractDone; }, prospect: function (r) { return r.isProspect; }, bad: function (r) { return r.isBad; }, bet: betOn, nobet: function (r) { return hasSpec(r) && !betOn(r); } };
@@ -9783,7 +9787,7 @@
     });
     listEl.addEventListener('change', function (e) {
       if (e.target.getAttribute && e.target.getAttribute('data-me') === 'dests') render();
-      if (e.target.getAttribute && e.target.getAttribute('data-f') === 'buyers') { var it = e.target.closest('.ldb-item'), lr = it && findLead(it.getAttribute('data-id')); if (lr && lr.ks) ksMemo(lr); }
+      if (e.target.getAttribute && e.target.getAttribute('data-f') === 'siteMemo') { var it = e.target.closest('.ldb-item'), lr = it && findLead(it.getAttribute('data-id')); if (lr && lr.ks) ksMemo(lr); }
     });
     listEl.addEventListener('keyup', function (e) { if (isEnterKey(e) && e.target.classList.contains('ldb-note')) e.target.blur(); });
     listEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && e.target.classList.contains('ldb-note')) e.preventDefault(); });
@@ -9940,10 +9944,12 @@
       return true;
     }
     function ksOn(s) { var l = ksLinks[s || 'ks']; return l && l.status === 'ok'; }
+    // 11/2 전엔 ② 메모가 사이트로 갔음 → 사이트에 메모가 이미 있고 새 칸을 안 써 봤으면 ② 메모 내용을 보여 줌
+    function siteMemoOf(r) { var s = r.spec || {}; return s.siteMemo !== undefined ? s.siteMemo : (r.ks && r.ks.memoIdx ? (s.buyers || '') : ''); }
     function ksMemo(r) {
       var s = r.ks.site || 'ks';
       if (!ksOn(s)) { toast(siteName(s) + ' 연결이 안 돼 있어서 앱에만 저장했어요'); return; }
-      var t = String((r.spec && r.spec.buyers) || '').trim(); // 스펙 ② 메모 칸
+      var t = String(siteMemoOf(r)).trim(); // 스펙 오픈사이트 메모 칸 (11/2부터, 전엔 ② 메모)
       if (r._ksSent === t || (!t && !r.ks.memoIdx)) return; // 바뀐 게 없으면 안 보냄
       r._ksSent = t; ksReq('memo', r.id, { text: t }, s);
     }
