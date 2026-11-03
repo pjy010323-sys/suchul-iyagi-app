@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261102135205">
+<meta name="app-build" content="20261103113022">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -6147,7 +6147,8 @@
     return records.filter(function (r) {
       return normMatch(r.carName).indexOf(q) !== -1 ||
         normMatch(r.country).indexOf(q) !== -1 ||
-        normMatch(r.buyerName).indexOf(q) !== -1;
+        normMatch(r.buyerName).indexOf(q) !== -1 ||
+        fuzzyHas(r.carName, q) || fuzzyHas(r.buyerName, q) || fuzzyHas(r.country, q);
     });
   }
 
@@ -6288,7 +6289,8 @@
     var q = (document.getElementById('recordsSearchInput').value || '').trim().toLowerCase();
     if (!q) return records.slice();
     return records.filter(function (r) {
-      return ((r.carName || '') + ' ' + (r.buyerName || '') + ' ' + (r.country || '')).toLowerCase().indexOf(q) !== -1;
+      return ((r.carName || '') + ' ' + (r.buyerName || '') + ' ' + (r.country || '')).toLowerCase().indexOf(q) !== -1 ||
+        fuzzyHas(r.carName, q) || fuzzyHas(r.buyerName, q) || fuzzyHas(r.country, q);
     });
   }
   function renderModalTable() {
@@ -6954,6 +6956,31 @@
     '디스커버리': ['디스커버리']
   };
   function normMatch(s) { return String(s || '').replace(/\s+/g, '').toLowerCase(); }
+  // 검색 전용: 맞춤법이 조금 달라도 찾히게 (그랜져→그랜저, 소렌토·쏘랜토→쏘렌토, 와리드·왈리두→왈리드)
+  // 한글을 초성·중성·종성으로 풀고 비슷한 소리를 하나로 접는다: 된소리·거센소리→예사소리(아반테≈아반떼), ㅐ/ㅔ, ㅒ/ㅖ/ㅑ/ㅕ→ㅏ/ㅓ, ㅛ→ㅗ, ㅠ/ㅡ→ㅜ, ㅙ/ㅞ/ㅚ, ㅢ→ㅣ, 받침 ㄹ+ㄹ→ㄹ
+  var FZ_CHO = ['g','g','n','d','d','r','m','b','b','s','s','','j','j','j','g','d','b','h'];
+  var FZ_JUNG = ['a','e','a','e','eo','e','eo','e','o','wa','we','we','o','u','wo','we','wi','u','u','i','i'];
+  var FZ_JONG = ['','g','g','g','n','n','n','d','r','r','r','r','r','r','r','r','m','b','b','s','s','ng','j','j','k','t','p','h'];
+  var fzCache = {};
+  function fuzzyKey(str) {
+    var raw = String(str || '');
+    if (fzCache[raw] !== undefined) return fzCache[raw];
+    var t = raw.replace(/\s+/g, '').toLowerCase(), o = '';
+    for (var i = 0; i < t.length; i++) {
+      var c = t.charCodeAt(i) - 0xAC00;
+      if (c < 0 || c > 11171) { o += t[i]; continue; }
+      var cho = Math.floor(c / 588), jung = Math.floor((c % 588) / 28), jong = c % 28;
+      var j = FZ_JUNG[jung];
+      if (jung === 6 && [12, 13, 14].indexOf(cho) === -1) j = 'yeo'; // ㅕ: 져·쳐는 저·처와 같은 소리라 접고, 나머지(려·변 등)는 구분
+      var next = t.charCodeAt(i + 1) - 0xAC00, nextR = next >= 0 && next <= 11171 && Math.floor(next / 588) === 5;
+      var fin = FZ_JONG[jong];
+      if (fin === 'r' && nextR) fin = ''; // 왈리 ≈ 와리
+      o += '|' + FZ_CHO[cho] + ':' + j + ':' + fin;
+    }
+    if (Object.keys(fzCache).length > 20000) fzCache = {};
+    return (fzCache[raw] = o);
+  }
+  function fuzzyHas(text, q) { return !!q && fuzzyKey(text).indexOf(fuzzyKey(q)) !== -1; }
   function aliasesForModel(modelKey) {
     return (MODEL_ALIASES[modelKey] || [modelKey.replace(/\(.*?\)/g, '')]).map(normMatch);
   }
@@ -7957,10 +7984,10 @@
   function renderBuyerModalList() {
     var q = buyerSearchInput.value.trim().toLowerCase();
     var list = !q ? records : records.filter(function (r) {
-      return ((r.buyerName || '') + (r.country || '') + (r.buyerContact || '')).toLowerCase().indexOf(q) !== -1;
+      return ((r.buyerName || '') + (r.country || '') + (r.buyerContact || '')).toLowerCase().indexOf(q) !== -1 || fuzzyHas(r.buyerName, q) || fuzzyHas(r.country, q);
     });
     var manualList = !q ? manualBuyers : manualBuyers.filter(function (b) {
-      return ((b.name || '') + (b.country || '') + (b.contact || '')).toLowerCase().indexOf(q) !== -1;
+      return ((b.name || '') + (b.country || '') + (b.contact || '')).toLowerCase().indexOf(q) !== -1 || fuzzyHas(b.name, q) || fuzzyHas(b.country, q);
     });
     renderBuyers(list, 'buyerListFull', manualList);
   }
@@ -8465,7 +8492,7 @@
     var seen = {};
     var matches = SEARCH_SUGGESTIONS.filter(function (s) {
       var norm = normMatch(s.text);
-      if (norm.indexOf(q) === -1 || seen[s.text]) return false;
+      if ((norm.indexOf(q) === -1 && !fuzzyHas(s.text, q)) || seen[s.text]) return false;
       seen[s.text] = true;
       return true;
     });
