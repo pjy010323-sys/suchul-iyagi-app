@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261106180934">
+<meta name="app-build" content="20261111111734">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -9763,8 +9763,14 @@
       collectSpec(item, r);
       if (act === 'spec') copy(specText(r), '스펙 복사됨');
       else if (act === 'scrap') copy(scrapText(r), '폐차견적 복사됨');
-      else if (act === 'send1') copy(send1(r), '송금요청 ① 복사됨 (차량인도일까지)');
-      else if (act === 'send2') copy(send2(r), '송금요청 ② 복사됨 (계약금 송금)');
+      else if (act === 'send1' || act === 'send2') {
+        copy(act === 'send1' ? send1(r) : send2(r), act === 'send1' ? '송금요청 ① 복사됨 (차량인도일까지)' : '송금요청 ② 복사됨 (계약금 송금)');
+        // 2026-11-11: 송금요청을 쓰면 계약완료 자동으로 켜기 (이미 켜져 있으면 그대로)
+        if (!r.contractDone) {
+          r.contractDone = true; saveLead(r, true); render();
+          if (window.__celebrateContract) { var ym2 = dayKey().slice(0, 7); window.__celebrateContract(leads.filter(function (x) { return x.contractDone && String(x.date).slice(0, 7) === ym2; }).length); }
+        }
+      }
       else if (act === 'tak') copy(takText(r), '탁송 양식 복사됨');
       else if (act === 'pickCh') {
         r.channel = a.getAttribute('data-v');
