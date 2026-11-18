@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261111111734">
+<meta name="app-build" content="20261118204332">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -9407,6 +9407,23 @@
       flush().then(function () { if (!Object.keys(readDrafts()).length) toast('저장 안 됐던 디비 ' + ids.length + '건을 서버에 저장했어요'); });
     };
     function busy(id) { return !!(pending[id] || inflight[id]); }
+    // 2026-11-18 사용자: "스펙 따는 거 클릭해도 인식 못 할 때가 많아" → 실시간 신호로 목록을 통째로 다시 그리는 순간 누르던 칸·버튼이 바뀌어 클릭이 사라졌음
+    //   ① 내용이 같은 신호는 무시 ② 마우스 누르는 중·클릭/타자 후 1.5초 안·입력칸/선택상자 사용 중이면 다시 그리기를 미룸
+    function stable(v) { if (v && typeof v === 'object' && !Array.isArray(v)) { var o = {}; Object.keys(v).sort().forEach(function (k) { o[k] = stable(v[k]); }); return o; } if (Array.isArray(v)) return v.map(stable); return v; }
+    function sameLead(a, b) { var ks = ['date', 'channel', 'phone', 'car', 'memo', 'name', 'source', 'status', 'contractDone', 'isProspect', 'isBad', 'note', 'spec', 'savedAt', 'ks']; return ks.every(function (k) { return JSON.stringify(stable(a[k] == null ? null : a[k])) === JSON.stringify(stable(b[k] == null ? null : b[k])); }); }
+    var lastAct = 0, ptrDown = false, softT = null;
+    overlay.addEventListener('pointerdown', function () { ptrDown = true; lastAct = Date.now(); }, true);
+    window.addEventListener('pointerup', function () { ptrDown = false; lastAct = Date.now(); }, true);
+    window.addEventListener('pointercancel', function () { ptrDown = false; }, true);
+    overlay.addEventListener('keydown', function () { lastAct = Date.now(); }, true);
+    overlay.addEventListener('wheel', function () { lastAct = Date.now(); }, { capture: true, passive: true });
+    function softRender() {
+      clearTimeout(softT); if (overlay.hidden) return;
+      var ae = document.activeElement, typing = ae && overlay.contains(ae) && ae.matches('input,textarea,select,[contenteditable="true"]');
+      var wait = 1500 - (Date.now() - lastAct);
+      if (ptrDown || typing || wait > 0) { softT = setTimeout(softRender, Math.max(wait, 500)); return; }
+      render();
+    }
     async function removeLead(id) {
       leads = leads.filter(function (r) { return r.id !== id; });
       delete pending[id]; var dr = readDrafts(); if (dr[id]) { delete dr[id]; writeDrafts(dr); } // 지운 문의가 되살아나지 않게
@@ -9439,10 +9456,10 @@
           else if (p.new) {
             var r = fromRow(p.new); if (busy(r.id)) return;
             var i = leads.findIndex(function (x) { return x.id === r.id; });
+            if (i >= 0 && sameLead(leads[i], r)) return; // 2026-11-18: 내가 저장한 게 되돌아온 신호 → 화면 그대로 (클릭 씹힘 원인)
             if (i >= 0) leads[i] = r; else if (!loadedFrom || r.date >= loadedFrom) leads.push(r);
           }
-          var ae = document.activeElement, typing = ae && overlay.contains(ae) && ae.matches('input,textarea');
-          if (!overlay.hidden && !typing) render(); // 입력 중이면 화면을 다시 그리지 않음 (쓰던 글이 날아가지 않게)
+          softRender(); // 2026-11-18: 클릭·타자 중이면 손이 멈춘 뒤에 한 번만 다시 그림
         }).subscribe();
       } catch (e) { console.warn('실시간 연결 실패', e); }
     }
@@ -10047,7 +10064,7 @@
     // 다른 앱으로 넘어가면 바로 저장, 돌아오면 저장을 먼저 끝낸 뒤 서버 목록을 새로 받는다 (저장 중인 건 덮어쓰지 않음)
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') { flush(); return; }
-      if (!overlay.hidden && loadedFrom) flush().then(function () { return load(loadedFrom); }).then(render);
+      if (!overlay.hidden && loadedFrom) flush().then(function () { return load(loadedFrom); }).then(softRender);
     });
     // 로그아웃하면 화면에 남은 문의를 비운다 (다른 사람이 로그인해도 안 보이게)
     document.getElementById('logoutBtn').addEventListener('click', function () { ksStop(); leads = []; loadedFrom = null; serverHits = null; memSend = {}; if (rt) { try { sb.removeChannel(rt); } catch (x) {} rt = null; } overlay.hidden = true; });
