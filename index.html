@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261118204332">
+<meta name="app-build" content="20261118210730">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -9672,20 +9672,21 @@
       var inp = function (f, val, ph) { return '<div class="ldb-f"><label>' + f[1] + '</label><input type="text" data-f="' + f[0] + '" value="' + esc(val || '') + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '></div>'; };
       var PH = { sendHeader: '비우면 제목 없이', vin: '예) KMFZCZ7KBHU362831', account: '예) 국민 123456-01-234567 홍길동', address: '예) 경기도 화성시 ...', amount: '숫자만 (예: 310)', deposit: '숫자만 (예: 10)', payType: '계약금 거래 / 완불거래', handover: '예) 금일, 10/22' };
       return '<div class="ldb-spec" data-spec-for="' + r.id + '"><div class="ldb-spec-grid">' +
-        '<div><h4>① 스펙</h4>' + ((r.spec && r.spec.direct) || !r.channel ? chHtml(r) : '') + inp(['header', '제목'], s.header) + SPEC_A.map(function (f) { return inp(f, s[f[0]]); }).join('') + '</div>' +
+        '<div><h4>① 스펙</h4>' + ((r.spec && r.spec.direct) || !r.channel ? chHtml(r) : '') + inp(['header', '제목'], s.header) + SPEC_A.map(function (f) { return inp(f, s[f[0]]); }).join('') +
+        // 2026-11-18 사용자: 오픈사이트 메모는 왼쪽 빈자리로, 그 자리에 탁송을 항상 펼쳐서
+        (r.ks ? '<h4 style="margin-top:10px">🔗 ' + siteName(r.ks.site) + ' 오픈사이트 메모 <span class="ldb-qq-sub" style="color:#7c3aed;font-weight:600">이 칸만 사이트에 저장돼요</span></h4><div class="ldb-f"><textarea data-f="siteMemo" rows="3" placeholder="오픈사이트에 남길 메모 (다 쓰고 칸 밖을 누르면 저장)">' + esc(siteMemoOf(r)) + '</textarea></div>' : '') + '</div>' +
         '<div><h4>💡 바로 견적 <span class="ldb-qq-sub">판매 기록 기준 · 적는 대로 바뀌어요</span></h4><div class="ldb-qq" data-qq>' + qqHtml(r) + '</div>' +
         '<div class="ldb-f" style="margin-top:10px"><label>💰 배팅금액</label><input type="text" data-f="bet" value="' + esc(s.bet || '') + '" placeholder="숫자만 (만원, 예: 120)"></div>' +
         '<h4 style="margin-top:10px">② 메모</h4><div class="ldb-f"><textarea data-f="buyers" rows="6" placeholder="통화하면서 들은 내용, 바이어 견적 등 (앱에만 저장)">' + esc(s.buyers || '') + '</textarea></div>' +
         // 2026-11-02 사용자: 스펙 따면서 메모 적을 곳이 없어서 → ② 메모는 앱 전용, 오픈사이트 메모는 이 칸만
-        (r.ks ? '<h4 style="margin-top:10px">🔗 ' + siteName(r.ks.site) + ' 오픈사이트 메모 <span class="ldb-qq-sub" style="color:#7c3aed;font-weight:600">이 칸만 사이트에 저장돼요</span></h4><div class="ldb-f"><textarea data-f="siteMemo" rows="3" placeholder="오픈사이트에 남길 메모 (다 쓰고 칸 밖을 누르면 저장)">' + esc(siteMemoOf(r)) + '</textarea></div>' : '') + '' +
+        takHtml(r, s, inp) +
         (openSend[r.id] ? '<h4 style="margin-top:10px">③ 송금 요청 (매입하는 차만)</h4>' + SEND.map(function (f) { return inp(f, t[f[0]], PH[f[0]]); }).join('') : '') +
-        (openTak[r.id] ? takHtml(r, s, inp) : '') + '</div>' +
+        '</div>' +
         '</div><div class="ldb-acts">' +
         '<button type="button" class="btn-accent" data-a="spec">📋 스펙 복사</button>' +
         '<button type="button" class="btn-accent" data-a="scrap" style="background:#475569;border-color:#475569">🚗 폐차견적 복사</button>' +
         '<button type="button" class="btn-ghost" data-a="sendToggle" style="border-color:#c2410c;color:#c2410c">' + (openSend[r.id] ? '💸 송금 요청 접기 ▴' : '💸 송금 요청 쓰기 ▾') + '</button>' +
         (openSend[r.id] ? '<button type="button" class="btn-accent" data-a="send1" style="background:#c2410c;border-color:#c2410c">💸 송금요청 ①</button><button type="button" class="btn-accent" data-a="send2" style="background:#9a3412;border-color:#9a3412">💸 송금요청 ②</button>' : '') +
-        '<button type="button" class="btn-ghost" data-a="takToggle" style="border-color:#0f766e;color:#0f766e">' + (openTak[r.id] ? '🚚 탁송 접기 ▴' : '🚚 탁송 쓰기 ▾') + '</button>' +
         '<button type="button" class="btn-accent" data-a="tak" style="background:#0f766e;border-color:#0f766e">🚚 탁송 복사</button>' +
         '<button type="button" class="btn-ghost" data-a="quote">견적 확인 바로 열기</button>' +
         '<button type="button" class="btn-ghost" data-a="closeSpec" style="margin-left:auto">▴ 스펙 접기</button>' +
@@ -9702,7 +9703,7 @@
       var mine = function (k, label, val, ph) { return '<div class="ldb-f"><label>' + label + '</label><input type="text" data-me="' + k + '" value="' + esc(val || '') + '" placeholder="' + ph + '"></div>'; };
       return '<h4 style="margin-top:10px">🚚 탁송</h4>' +
         inp(['takReserve', '예약'], s.takReserve, '예) 2026-10-22 오전 10시') +
-        (openSend[r.id] ? '<div class="ldb-qq-empty" style="margin:0 0 4px">출발지 = 위 송금 요청의 주소 칸</div>' : inp(['address', '출발지'], s.address, '손님 차 있는 주소 (송금 요청 주소와 같은 칸)')) +
+        (openSend[r.id] ? '<div class="ldb-qq-empty" style="margin:0 0 4px">출발지 = 아래 송금 요청의 주소 칸</div>' : inp(['address', '출발지'], s.address, '손님 차 있는 주소 (송금 요청 주소와 같은 칸)')) +
         inp(['takDest', '도착지'], s.takDest, '아래 버튼으로 고르거나 직접 입력') +
         '<div class="ldb-dests">' + m.dests.map(function (d) { return '<button type="button" class="ldb-dest" data-a="pickDest" data-v="' + esc(d) + '" data-on="' + (s.takDest === d ? 1 : 0) + '">' + esc(d) + '</button>'; }).join('') + '</div>' +
         '<div class="ldb-me"><div class="ldb-qq-sub" style="margin-bottom:4px">내 정보 (한 번 적으면 계속 자동으로 들어가요)</div>' +
