@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261118210730">
+<meta name="app-build" content="20261119093747">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -9707,8 +9707,7 @@
         inp(['takDest', '도착지'], s.takDest, '아래 버튼으로 고르거나 직접 입력') +
         '<div class="ldb-dests">' + m.dests.map(function (d) { return '<button type="button" class="ldb-dest" data-a="pickDest" data-v="' + esc(d) + '" data-on="' + (s.takDest === d ? 1 : 0) + '">' + esc(d) + '</button>'; }).join('') + '</div>' +
         '<div class="ldb-me"><div class="ldb-qq-sub" style="margin-bottom:4px">내 정보 (한 번 적으면 계속 자동으로 들어가요)</div>' +
-        mine('name', '담당자', m.name, '이름') + mine('phone', '담당자 전화', m.phone, '010-0000-0000') + mine('dests', '도착지 목록', me.dests == null ? DEFAULT_DESTS : me.dests, '쉼표로 구분: KS야드, 동춘야드, 회사인근') + '</div>' +
-        '<pre class="ldb-tak" data-tak>' + esc(takText(r)) + '</pre>';
+        mine('name', '담당자', m.name, '이름') + mine('phone', '담당자 전화', m.phone, '010-0000-0000') + mine('dests', '도착지 목록', me.dests == null ? DEFAULT_DESTS : me.dests, '쉼표로 구분: KS야드, 동춘야드, 회사인근') + '</div>'; // 2026-11-19 사용자: 탁송 미리보기는 칸이 너무 길어져서 뺌 (🚚 탁송 복사로 내용 그대로 복사됨)
     }
     function itemHtml(r, dupCount) {
       var st = function (k, label, on) { return '<button type="button" class="ldb-btn" data-k="' + k + '" data-on="' + (on ? 1 : 0) + '">' + label + '</button>'; };
