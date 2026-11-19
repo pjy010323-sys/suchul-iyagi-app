@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261119093747">
+<meta name="app-build" content="20261119174500">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -9431,9 +9431,20 @@
       var res = await sb.from('leads').update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id);
       if (res.error) { alert('삭제에 실패했어요: ' + res.error.message); }
     }
+    async function pageAll(mk) {
+      var all = [];
+      for (var off = 0; off < 50000; off += 1000) {
+        var r = await mk().range(off, off + 999);
+        if (r.error) return { error: r.error, data: all };
+        all = all.concat(r.data || []);
+        if (!r.data || r.data.length < 1000) break;
+      }
+      return { error: null, data: all };
+    }
     async function load(from) {
       setSync('불러오는 중…');
-      var res = await sb.from('leads').select('*').eq('user_id', currentUser.id).is('deleted_at', null).gte('date', from).order('saved_at', { ascending: true }).limit(5000);
+      // 2026-11-19: 서버가 한 번에 1000건까지만 줘서 최근 디비가 잘렸음(박재희 60일 1073건) → 1000건씩 나눠 받기
+      var res = await pageAll(function () { return sb.from('leads').select('*').eq('user_id', currentUser.id).is('deleted_at', null).gte('date', from).order('saved_at', { ascending: true }).order('id', { ascending: true }); });
       if (res.error) { setSync('⚠ 불러오기 실패'); listEl.innerHTML = '<div class="ldb-empty">불러오지 못했어요: ' + esc(res.error.message) + '</div>'; return false; }
       var have = {}; leads.forEach(function (r) { have[r.id] = r; });
       var drafts = readDrafts();
@@ -10072,6 +10083,7 @@
 
   // ===== 휴지통 (1·2단계) · 직원 디비 현황 (1단계) · 1단계 주간 자동 백업 — 2026-10-20 =====
   (function ownerTools() {
+    async function pageAll(mk) { var all = []; for (var off = 0; off < 50000; off += 1000) { var r = await mk().range(off, off + 999); if (r.error) return { error: r.error, data: all }; all = all.concat(r.data || []); if (!r.data || r.data.length < 1000) break; } return { error: null, data: all }; }
     var $ = function (id) { return document.getElementById(id); };
     var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var pad = function (n) { return String(n).padStart(2, '0'); };
@@ -10139,7 +10151,7 @@
     async function showDetail(uid) {
       var s = staff.find(function (x) { return x.user_id === uid; }); if (!s) return;
       var el = $('statsDetail'); el.innerHTML = '<div class="ldb-empty">불러오는 중…</div>';
-      var res = await sb.from('leads').select('*').eq('user_id', uid).is('deleted_at', null).gte('date', $('statsFrom').value).lte('date', $('statsTo').value).order('date', { ascending: false }).order('saved_at', { ascending: false }).limit(1000);
+      var res = await pageAll(function () { return sb.from('leads').select('*').eq('user_id', uid).is('deleted_at', null).gte('date', $('statsFrom').value).lte('date', $('statsTo').value).order('date', { ascending: false }).order('saved_at', { ascending: false }).order('id', { ascending: true }); });
       if (res.error) { el.innerHTML = '<div class="ldb-empty">' + esc(res.error.message) + '</div>'; return; }
       var rows = res.data || [];
       var others = staff.filter(function (x) { return x.user_id !== uid; });
