@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261119174500">
+<meta name="app-build" content="20261119183000">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -5147,11 +5147,14 @@
   var lastQuoteQuery = null; // 견적확인에서 마지막으로 검색한 조건 (도움됨/안됨 피드백에 씀)
   var lastQuoteResult = null;
   // 최상위 관리자는 기존 관리자 권한(삭제, 회원관리, 백업)을 전부 포함함
-  function hasAdminRights(u) { return !!u && (u.role === 'admin' || u.role === 'super_admin'); }
+  // 2026-11-19: 일반 회원(member) = 관리자와 같은 화면, 단 대본·회원 관리·삭제 버튼 없음
+  function isMember(u) { return !!u && u.role === 'member'; }
+  function hasAdminRights(u) { return !!u && (u.role === 'admin' || u.role === 'super_admin' || u.role === 'member'); }
+  function canDelete(u) { return !!u && (u.role === 'admin' || u.role === 'super_admin'); }
   function isSuperAdmin(u) { return !!u && u.role === 'super_admin'; }
   // 2026-10-20: 3단계 — 1단계 최상위 관리자(is_owner) / 2단계 운영관리자(super_admin) / 3단계 관리자(admin, 승인된 모든 사람)
   function isOwner(u) { return !!u && u.isOwner && u.role === 'super_admin'; }
-  function roleLabel(role, owner) { return owner && role === 'super_admin' ? '최상위 관리자' : role === 'super_admin' ? '운영관리자' : role === 'admin' ? '관리자' : '승인됨'; }
+  function roleLabel(role, owner) { return owner && role === 'super_admin' ? '최상위 관리자' : role === 'super_admin' ? '운영관리자' : role === 'admin' ? '관리자' : role === 'member' ? '일반 회원' : '승인됨'; }
 
   function toDbRow(r) {
     return {
@@ -5843,7 +5846,7 @@
     }).join('');
   }
   function scriptCardHtml(s) {
-    var canEdit = hasAdminRights(currentUser);
+    var canEdit = canDelete(currentUser);
     var isFav = !!scriptFavoriteIds[s.id];
     return '<div class="script-card" data-id="' + escapeHtml(s.id) + '">' +
       '<div class="script-card-header" data-action="toggle-script">' +
@@ -6232,7 +6235,7 @@
       '</div>' +
       '<div class="buyer-tx-list"><div class="muted" style="margin-bottom:4px;">거래내역</div>' + itemsHtml + '</div>' +
       '<div class="modal-actions">' +
-      (r.manualId && r.count === 0 && hasAdminRights(currentUser) ? '<button type="button" class="btn-danger" data-action="delete-buyer" data-manual-id="' + r.manualId + '">이 바이어 삭제</button>' : '') +
+      (r.manualId && r.count === 0 && canDelete(currentUser) ? '<button type="button" class="btn-danger" data-action="delete-buyer" data-manual-id="' + r.manualId + '">이 바이어 삭제</button>' : '') +
       '<button type="button" class="btn-ghost" data-action="collapse-buyer">닫기</button>' +
       '<button type="button" class="btn-accent" data-action="save-buyer" data-key="' + escapeHtml(r.key) + '" data-manual-id="' + escapeHtml(r.manualId || '') + '" data-name="' + escapeHtml(r.name) + '">저장</button>' +
       '</div>' +
@@ -6351,7 +6354,7 @@
         '<td>' + statusPill(r.status) + '</td>' +
         '<td><div class="row-actions">' +
         '<button type="button" class="btn-ghost" data-action="edit">수정</button>' +
-        (hasAdminRights(currentUser) ? '<button type="button" class="btn-danger" data-action="delete">삭제</button>' : '') +
+        (canDelete(currentUser) ? '<button type="button" class="btn-danger" data-action="delete">삭제</button>' : '') +
         '</div></td>' +
         '</tr>';
     }).join('');
@@ -8420,7 +8423,7 @@
     if (btn.dataset.action === 'edit') {
       openModal(record);
     } else if (btn.dataset.action === 'delete') {
-      if (!hasAdminRights(currentUser)) { alert('삭제는 관리자만 할 수 있어요.'); return; }
+      if (!canDelete(currentUser)) { alert('삭제는 관리자만 할 수 있어요.'); return; }
       if (await askConfirm(record.carName + ' 기록을 삭제할까요? (휴지통으로 가요. 운영관리자 이상이 복구할 수 있어요)')) {
         var ok = await deleteRecordOnServer(id);
         if (!ok) return;
@@ -8696,12 +8699,13 @@
     document.getElementById('carFilterRow').hidden = !hasAdminRights(currentUser);
     document.getElementById('importBtn').hidden = !hasAdminRights(currentUser);
     if (!hasAdminRights(currentUser)) document.getElementById('filterHint').hidden = true;
-    document.getElementById('scriptAddBtn').hidden = !hasAdminRights(currentUser);
+    document.getElementById('scriptAddBtn').hidden = !canDelete(currentUser);
+    document.getElementById('openScripts').hidden = isMember(currentUser); // 일반 회원은 대본 안 보임
     renderGreeting();
     startIdleWatch();
     startPresence();
     loadTodos();
-    loadScripts();
+    if (!isMember(currentUser)) loadScripts();
   }
 
   // ---------- 누가 지금 접속 중인지 (Supabase Realtime Presence) ----------
@@ -9075,7 +9079,7 @@
       '</div>' +
       '<div class="feedback-form">' +
       '<button type="button" class="btn-ghost" data-action="edit-feedback">수정</button>' +
-      '<button type="button" class="btn-danger" data-action="delete-feedback">삭제</button>' +
+      (canDelete(currentUser) ? '<button type="button" class="btn-danger" data-action="delete-feedback">삭제</button>' : '') +
       '</div>' +
       '</div>';
   }
@@ -9209,13 +9213,15 @@
       if (m.id === currentUser.id) {
         actions = '<span class="muted">나</span>';
       } else if (!m.approved) {
-        actions = '<button type="button" class="btn-accent" data-action="approve" data-id="' + m.id + '">승인</button>' + deleteBtn;
+        actions = '<button type="button" class="btn-accent" data-action="approve" data-id="' + m.id + '">승인(관리자)</button>' +
+          '<button type="button" class="btn-ghost" data-action="approve-member" data-id="' + m.id + '">일반 회원으로 승인</button>' + deleteBtn;
       } else if (m.is_owner) {
         actions = ''; // 1단계 계정은 다른 사람이 바꿀 수 없음
       } else if (m.role === 'super_admin') {
         actions = isSuperAdmin(currentUser) ? '<button type="button" class="btn-ghost" data-action="demote-super" data-id="' + m.id + '">운영관리자 해제</button>' : '';
       } else if (m.role === 'admin') {
         actions = (isSuperAdmin(currentUser) ? '<button type="button" class="btn-ghost" data-action="promote-super" data-id="' + m.id + '">운영관리자로</button>' +
+          '<button type="button" class="btn-ghost" data-action="demote" data-id="' + m.id + '">일반 회원으로</button>' +
           '<button type="button" class="btn-danger" data-action="revoke" data-id="' + m.id + '">승인 취소</button>' : '') + deleteBtn;
       } else {
         actions = (isSuperAdmin(currentUser) ? '<button type="button" class="btn-ghost" data-action="promote" data-id="' + m.id + '">관리자로</button>' : '') +
@@ -9237,10 +9243,11 @@
     if (action === 'approve') patch = { approved: true, role: 'admin' }; // 승인하면 바로 3단계 관리자
     else if (action === 'promote') {
       if (!isSuperAdmin(currentUser)) { alert('관리자 지정은 최상위 관리자만 할 수 있어요.'); return; }
-      if (!await askConfirm('관리자로 지정할까요? 관리자는 삭제 권한까지 가져요.')) return;
+      if (!await askConfirm('관리자로 바꿀까요? 대본이 보이고 삭제 권한까지 가져요.')) return;
       patch = { role: 'admin' };
     }
-    else if (action === 'demote') patch = { role: 'member' };
+    else if (action === 'approve-member') patch = { approved: true, role: 'member' };
+    else if (action === 'demote') { if (!isSuperAdmin(currentUser)) return; if (!await askConfirm('일반 회원으로 바꿀까요? 대본·삭제 버튼이 안 보이게 돼요.')) return; patch = { role: 'member' }; }
     else if (action === 'revoke') { if (!await askConfirm('승인을 취소할까요? 이 회원은 다시 승인 대기 상태가 돼요.')) return; patch = { approved: false }; }
     else if (action === 'promote-super') {
       if (!isSuperAdmin(currentUser)) { alert('최상위 관리자만 지정할 수 있어요.'); return; }
