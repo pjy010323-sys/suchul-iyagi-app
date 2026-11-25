@@ -927,7 +927,7 @@
   window.askConfirm = function (m) { return show(m, true); };
 })();
 </script>
-<meta name="app-build" content="20261119183000">
+<meta name="app-build" content="20261125103425">
 <script>
 // 2026-10-22: 휴대폰 웹앱은 백그라운드에 살아 있어서 다시 열어도 예전 화면을 그대로 보여줌
 // → 화면에 돌아올 때·10분마다 서버의 index.html 버전(app-build)을 확인하고, 바뀌었으면 위쪽에 "업데이트" 띠를 띄움.
@@ -6212,7 +6212,8 @@
       '<div>' +
       '<div class="buyer-name">' + escapeHtml(r.name) + ' <span class="muted buyer-caret">' + (expanded ? '▾' : '▸') + '</span></div>' +
       '<div class="buyer-sub">' + escapeHtml(r.country || '-') + (r.contact ? ' · ' + escapeHtml(r.contact) : '') +
-      (r.count ? ' · 거래 ' + r.count + '건' : ' · <span class="muted">거래기록 없음(직접등록)</span>') +
+      (r.count ? ' · 거래 ' + r.count + '건' + (r.lastDate ? ' · 최근 ' + escapeHtml(fmtDate(r.lastDate)) : '') : ' · <span class="muted">거래기록 없음(직접등록)</span>') +
+      (r.otherNames && r.otherNames.length ? ' · <span class="muted">다른 이름: ' + escapeHtml(r.otherNames.join(', ')) + '</span>' : '') +
       '</div>' +
       (!expanded && r.note ? '<div class="buyer-note-preview">📝 ' + escapeHtml(r.note) + '</div>' : '') +
       '</div>' +
@@ -6243,31 +6244,49 @@
     return '<div class="buyer-card expanded">' + head + body + '</div>';
   }
 
+  // 2026-11-20 사용자: "마지드 전화해 보니 번호가 다르다" → 예전엔 이름으로만 묶고 연락처는 가장 비싼 거래 번호를 보여줌
+  //   (마지드 번호 5개, 압둘 18개가 한 카드로 합쳐짐). 이제 번호가 있으면 번호 기준으로 카드를 나누고, 이름은 그 번호에서 가장 많이 쓴 이름.
+  //   번호 없는 기록만 이름으로 묶음. 국가·연락처는 가장 최근 거래 기준. 정렬은 최근 거래 순.
+  function phoneDigits(v) { var d = String(v || '').replace(/[^0-9]/g, ''); return d.length >= 9 ? d : ''; }
+  function fmtPhone(d) { return /^01[0-9]{9}$/.test(d) ? d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7) : /^01[0-9]{8}$/.test(d) ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : d; }
   function renderBuyers(list, targetId, manualList) {
     var el = document.getElementById(targetId || 'buyerListFull');
     var map = {};
     list.forEach(function (r) {
-      var key = (r.buyerName || '미지정').trim().toLowerCase() || 'unknown';
-      var entry = map[key] || { key: key, name: r.buyerName || '미지정', country: r.country, contact: r.buyerContact, note: '', maxPrice: 0, lastDate: '', count: 0, manualId: null, items: [] };
+      var nm = (r.buyerName || '').trim(), pd = phoneDigits(r.buyerContact);
+      if (!nm && !pd) nm = '미지정';
+      var key = pd ? 'p:' + pd : 'n:' + nm.toLowerCase();
+      var entry = map[key] || { key: key, name: nm || '이름 없음', names: {}, phone: pd, country: r.country, contact: pd ? fmtPhone(pd) : r.buyerContact, note: '', maxPrice: 0, lastDate: '', count: 0, manualId: null, items: [] };
       entry.count += 1;
       entry.items.push(r);
+      if (nm) entry.names[nm] = (entry.names[nm] || 0) + 1;
       var p = Number(r.price) || 0;
-      if (p >= entry.maxPrice) {
-        entry.maxPrice = p;
+      if (p >= entry.maxPrice) entry.maxPrice = p;
+      if (!entry.lastDate || (r.saleDate && r.saleDate >= entry.lastDate)) {
+        entry.lastDate = r.saleDate || entry.lastDate;
         entry.country = r.country || entry.country;
-        entry.contact = r.buyerContact || entry.contact;
+        if (!pd && r.buyerContact) entry.contact = r.buyerContact;
       }
-      if (!entry.lastDate || (r.saleDate && r.saleDate > entry.lastDate)) entry.lastDate = r.saleDate || entry.lastDate;
       map[key] = entry;
     });
-    // 판매기록 없이 직접 등록해둔 바이어도 이름 기준으로 같이 합침 -- 거래 기록이 있으면 국가·연락처·메모가
-    // 비어있을 때만 보충하고, 아예 없던 이름이면 "거래 0건" 새 항목으로 추가함
+    Object.keys(map).forEach(function (k) {
+      var e = map[k], ns = Object.keys(e.names).sort(function (x, y) { return e.names[y] - e.names[x]; });
+      if (ns.length) e.name = ns[0];
+      e.otherNames = ns.slice(1);
+    });
+    // 직접 등록한 바이어: 번호가 있으면 같은 번호 카드에, 없으면 같은 이름 카드(번호 없는 것 → 그 이름 카드가 하나뿐일 때)에 붙임
     (manualList || manualBuyers || []).forEach(function (b) {
-      var key = (b.name || '').trim().toLowerCase();
-      if (!key) return;
-      var entry = map[key] || { key: key, name: b.name, country: null, contact: null, note: '', maxPrice: 0, lastDate: '', count: 0, manualId: null, items: [] };
+      var nm = (b.name || '').trim(), pd = phoneDigits(b.contact);
+      if (!nm && !pd) return;
+      var key = pd ? 'p:' + pd : 'n:' + nm.toLowerCase();
+      if (!map[key] && !pd) {
+        var same = Object.keys(map).filter(function (k) { return map[k].name.toLowerCase() === nm.toLowerCase(); });
+        if (same.length === 1) key = same[0];
+      }
+      var entry = map[key] || { key: key, name: nm || fmtPhone(pd), names: {}, otherNames: [], phone: pd, country: null, contact: pd ? fmtPhone(pd) : null, note: '', maxPrice: 0, lastDate: '', count: 0, manualId: null, items: [] };
+      if (entry.manualId) return; // 같은 카드에 직접 등록이 둘이면 처음 것만
       entry.manualId = b.id;
-      if (!entry.contact) entry.contact = b.contact;
+      if (b.contact) entry.contact = pd ? fmtPhone(pd) : b.contact;
       if (!entry.country) entry.country = b.country;
       if (b.note) entry.note = b.note;
       map[key] = entry;
@@ -6277,7 +6296,7 @@
       el.innerHTML = '<div class="empty-note">거래가 등록되거나 바이어를 직접 추가하면 여기 정리돼요.</div>';
       return;
     }
-    rows.sort(function (a, b) { return b.maxPrice - a.maxPrice; });
+    rows.sort(function (a, b) { return (b.lastDate || '').localeCompare(a.lastDate || '') || b.maxPrice - a.maxPrice; });
     el.innerHTML = rows.map(buyerCardHtml).join('');
   }
 
@@ -7986,11 +8005,12 @@
   var buyerSearchInput = document.getElementById('buyerSearchInput');
   function renderBuyerModalList() {
     var q = buyerSearchInput.value.trim().toLowerCase();
+    var qd = q.replace(/[^0-9]/g, ''); if (qd.length < 4 || qd.length < q.replace(/[s-]/g, '').length) qd = '';
     var list = !q ? records : records.filter(function (r) {
-      return ((r.buyerName || '') + (r.country || '') + (r.buyerContact || '')).toLowerCase().indexOf(q) !== -1 || fuzzyHas(r.buyerName, q) || fuzzyHas(r.country, q);
+      return ((r.buyerName || '') + (r.country || '') + (r.buyerContact || '')).toLowerCase().indexOf(q) !== -1 || fuzzyHas(r.buyerName, q) || fuzzyHas(r.country, q) || (qd && String(r.buyerContact || '').replace(/[^0-9]/g, '').indexOf(qd) !== -1);
     });
     var manualList = !q ? manualBuyers : manualBuyers.filter(function (b) {
-      return ((b.name || '') + (b.country || '') + (b.contact || '')).toLowerCase().indexOf(q) !== -1 || fuzzyHas(b.name, q) || fuzzyHas(b.country, q);
+      return ((b.name || '') + (b.country || '') + (b.contact || '')).toLowerCase().indexOf(q) !== -1 || fuzzyHas(b.name, q) || fuzzyHas(b.country, q) || (qd && String(b.contact || '').replace(/[^0-9]/g, '').indexOf(qd) !== -1);
     });
     renderBuyers(list, 'buyerListFull', manualList);
   }
